@@ -493,6 +493,18 @@ class TemperatureMap(GenericMap):
 
         return
     
+    def plot(self, vmin=None, vmax=None, *args, **kwargs):
+        mean = self.mean(dtype=np.float64)
+        std = self.std(dtype=np.float64)
+        if vmin is None:
+            vmin = mean - (2.0 * std)
+        if vmax is None:
+            vmax = mean + (2.0 * std)
+        
+        self.plot(self, vmin=vmin, vmax=vmax, cmap=self.cmap)
+        
+        return
+    
     def save(self):
         date = sunpy.time.parse_time(self.date)
         error = sys('touch '+self.maps_dir+'data/{:%Y/%m/%d/} > shelloutput.txt'.format(date))
