@@ -350,6 +350,11 @@ class TemperatureMap(GenericMap):
                 #data, meta = create_tempmap(date, n_params, data_dir, maps_dir)
                 data, meta = create_tempmap(date, n_params, data_dir, maps_dir)
                 GenericMap.__init__(self, data, meta)
+                centre_x = self.reference_pixel['x']
+                centre_y = self.reference_pixel['y']
+                x_grid, y_grid = np.mgrid[-centre_x:centre_x-1, -centre_y:centre_y-1]
+                r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
+                self.data[r_grid > centre_x * 1.15] = None
             #self.data = data
             #self.meta = meta
 
