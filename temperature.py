@@ -507,7 +507,7 @@ class TemperatureMap(GenericMap):
         if vmax is None:
             vmax = mean + (2.0 * std)
         
-        GenericMap.plot(self, vmin=vmin, vmax=vmax, cmap=self.cmap, *args, **kwargs)
+        GenericMap.plot(self, vmin=vmin, vmax=vmax, *args, **kwargs)
         
         return
     
