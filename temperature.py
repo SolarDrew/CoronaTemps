@@ -264,7 +264,8 @@ def calculate_temperatures(date, n_params=1, data_dir=home+'SDO_data/',
                               vso.attrs.Wave(wlen, wlen),
                               vso.attrs.Instrument('aia'),
                               vso.attrs.Provider('JSOC'))
-            res = client.get(qr, path=fits_dir+'{file}', site='NSO').wait()
+            res = client.get(qr, path=fits_dir+'{file}', site='NSO',
+                             methods=['URL_FILE_Rice']).wait()
 
     n_wlens = len(wlens)
     temp = np.arange(5.6, 7.01, 0.01)
