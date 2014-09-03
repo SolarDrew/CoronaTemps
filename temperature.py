@@ -349,7 +349,7 @@ class TemperatureMap(GenericMap):
                 GenericMap.__init__(self, newmap.data[:, :, 0], newmap.meta)
             else:
                 #data, meta = create_tempmap(date, n_params, data_dir, maps_dir)
-                data, meta = create_tempmap(date, n_params, data_dir, maps_dir)
+                data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir)
                 GenericMap.__init__(self, data, meta)
                 centre_x = self.reference_pixel['x']
                 centre_y = self.reference_pixel['y']
@@ -500,8 +500,8 @@ class TemperatureMap(GenericMap):
         return
     
     def plot(self, vmin=None, vmax=None, *args, **kwargs):
-        mean = self.mean(dtype=np.float64)
-        std = self.std(dtype=np.float64)
+        mean = np.nanmean(self.data, dtype=np.float64)
+        std = np.nanstd(self.data, dtype=np.float64)
         if vmin is None:
             vmin = mean - (2.0 * std)
         if vmax is None:
