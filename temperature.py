@@ -15,6 +15,7 @@ from sunpy.net import vso
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
+from astropy import units as u
 from os import system as sys
 #import numexpr as ne
 try:
@@ -210,9 +211,11 @@ def create_tempmap(date, n_params=1, data_dir=home+'SDO_data/',
         client = vso.VSOClient()
         if temp_im == []:
             print 'File not found. Downloading from VSO...'
+            # Wavelength value for query needs to be an astropy Quantity
+            wquant = u.Quantity(value=int(wlen), unit='Angstrom')
             qr = client.query(vso.attrs.Time(date,# - dt.timedelta(seconds=6),
                                              date + dt.timedelta(seconds=12)),#6)),
-                              vso.attrs.Wave(wlen, wlen),
+                              vso.attrs.Wave(wquant, wquant),
                               vso.attrs.Instrument('aia'),
                               vso.attrs.Provider('JSOC'))
             res = client.get(qr, path=fits_dir+'{file}', site='NSO').wait()
