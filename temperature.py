@@ -223,7 +223,7 @@ def create_tempmap(date, n_params=1, data_dir=home+'SDO_data/',
         if temp_im == []:
             print 'Downloading failed.'
             print res, len(qr), qr
-            return np.zeros((512, 512))
+            return np.zeros((512, 512)), None, None
         if isinstance(temp_im, list):
             temp_im = temp_im[0]
         # TODO: save out level 1.5 data so it can be loaded quickly.
