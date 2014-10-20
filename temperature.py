@@ -60,7 +60,7 @@ def load_temp_responses(n_wlens=6, corrections=True):
     return resp
 
 
-def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=home+'temperature_maps/'):
+def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'temperature_maps/'):
     x, y = images[0].shape
     n_wlens = len(images)
     n_temps = int((7.0 - t0) / 0.01) + 1
@@ -98,8 +98,8 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=home+'temperature_
     return tempmap
 
 
-def create_tempmap(date, n_params=1, data_dir=home+'SDO_data/',
-                   maps_dir=home+'temperature_maps/', datfile=None):
+def create_tempmap(date, n_params=1, data_dir=None,
+                   maps_dir=None, datfile=None):
     wlens = ['094', '131', '171', '193', '211', '335']
     t0 = 5.6
     images = []
@@ -137,8 +137,8 @@ def create_tempmap(date, n_params=1, data_dir=home+'SDO_data/',
     return tempmap
 
 
-def calculate_temperatures(date, n_params=1, data_dir=home+'SDO_data/',
-                            maps_dir=home+'temperature_maps/', n_procs=4):
+def calculate_temperatures(date, n_params=1, data_dir=None,
+                            maps_dir=None, n_procs=4):
     wlens = ['94', '131', '171', '193', '211', '335']
     # Loop through wavelengths
     for wl, wlen in enumerate(wlens):
