@@ -114,13 +114,11 @@ def create_tempmap(date, n_params=1, data_dir=None,
             thiswlen = line[:3]
             print 'Loading {} files'.format(thiswlen)
         elif 'fits' in line:
-            print line
             thismap = aiaprep(Map(line[:-1]))
             thismap.data /= thismap.exposure_time
             allwlenmaps.append(thismap)
         elif line.strip() in ['', '\n']:
             if thiswlen:
-                print thiswlen, line
                 wlenmap = allwlenmaps[-1]
                 for thismap in allwlenmaps[:-1]:
                     wlenmap.data += thismap.data
@@ -328,7 +326,7 @@ class TemperatureMap(GenericMap):
     def save(self):
         date = sunpy.time.parse_time(self.date)
         fname = os.path.join(self.maps_dir,
-                        '{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+                             '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
