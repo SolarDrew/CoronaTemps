@@ -5,6 +5,8 @@ Created on Thu Jun  5 15:15:09 2014
 @author: drew
 """
 
+from matplotlib import use
+use('agg')
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import patches
@@ -14,6 +16,7 @@ from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
 from sys import argv
+import os
 from os import system as sys
 try:
     from fits import calc_fits
@@ -161,8 +164,9 @@ class TemperatureMap(GenericMap):
 
         if infofile:
             data_dir = None
-            maps_dir = open(infofile).readline()
-            fname = maps_dir+'/data/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date)
+            maps_dir = open(infofile).readline()[:-1]
+            fname = os.join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+            fname.replace('/images/', '/data/')
 
         try:
             newmap = Map(fname)
@@ -288,19 +292,20 @@ class TemperatureMap(GenericMap):
             thismap.plot()#*extr_args, **extr_kwargs)
         
         if save_output:
-            error = sys('touch '+maps_dir+'maps/{:%Y/%m/%d/} > shelloutput.txt'.format(date))
+            error = os.system('touch '+os.join(maps_dir,'maps/{:%Y/%m/%d/} > shelloutput.txt'.format(date)))
             if error != 0:
-                sys('{0}{1:%Y}; {0}{1:%Y/%m}; {0}{1:%Y/%m/%d} > shelloutput.txt'\
-                        .format('mkdir '+maps_dir+'maps/', date))
-            filename = maps_dir+'maps/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}_with{}'.\
-                    format(date, display_wlen)
+                os.system('{0}{1:%Y}; {0}{1:%Y/%m}; {0}{1:%Y/%m/%d} > shelloutput.txt'\
+                        .format('mkdir '+os.join(maps_dir, 'maps/'), date))
+            filename = os.join(maps_dir,
+                'maps/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}_with{}'.format(date,
+                                                                   display_wlen))
             plt.savefig(filename)
             if self.region != None:
                 reg_dir = maps_dir + 'maps/region_maps'
                 reg_dir = reg_dir + '/{}/'. format(self.region)
-                error = sys('touch ' + reg_dir + ' > shelloutput.txt')
+                error = os.system('touch ' + reg_dir + ' > shelloutput.txt')
                 if error != 0:
-                    sys('mkdir ' + reg_dir + ' > shelloutput.txt')
+                    os.system('mkdir ' + reg_dir + ' > shelloutput.txt')
                 plt.savefig(reg_dir+'{:%Y-%m-%dT%H:%M:%S}'.format(date))
             plt.close()
         else:
@@ -322,11 +327,9 @@ class TemperatureMap(GenericMap):
     
     def save(self):
         date = sunpy.time.parse_time(self.date)
-        error = sys('touch '+self.maps_dir+'data/{:%Y/%m/%d/} > shelloutput.txt'.format(date))
-        if error != 0:
-            sys('{0}{1:%Y}; {0}{1:%Y/%m}; {0}{1:%Y/%m/%d} > shelloutput.txt'.format(
-                'mkdir '+self.maps_dir+'data/', date))
-        GenericMap.save(self, self.maps_dir+'data/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date), clobber=True)
+        fname = os.join(self.maps_dir,
+                        '{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+        GenericMap.save(self, fname, clobber=True)
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
@@ -336,3 +339,12 @@ if __name__ == "__main__":
     
     tmap = TemperatureMap(date, infofile=infofile)
     tmap.save()
+    
+    image_dir = open(infofile).readline()[:-1]
+    fname = os.join(image_dir, '{:%Y-%m-%dT%H:%M:%S}'.format(date))
+    
+    fig = plt.figure(16, 12)
+    tmap.plot()
+    plt.colorbar(orientation='vertical')
+    plt.savefig(fname)
+    plt.close()
