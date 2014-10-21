@@ -9,13 +9,10 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib import patches
 import numpy as np
-import datetime as dt
 import sunpy
-from sunpy.net import vso
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
-from astropy import units as u
 from sys import argv
 from os import system as sys
 try:
@@ -41,7 +38,7 @@ def gaussian(x, mean=0.0, std=1.0, amp=1.0):
 def load_temp_responses(n_wlens=6, corrections=True):
     resp = np.zeros((n_wlens, 301))
     try:
-        tresp = read(home + 'aia_tresp')
+        tresp = read('aia_tresp')
     except IOError:
         tresp = read('/imaps/holly/home/ajl7/aia_tresp')
     resp[0, 80:181] = tresp['resp94']
@@ -69,7 +66,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'tempe
     try:
         if force_temp_scan:
             raise IOError
-        model = np.memmap(filename=home+'synth_emiss_1pars', dtype='float32',
+        model = np.memmap(filename='synth_emiss_1pars', dtype='float32',
                           mode='r', shape=(n_temps, n_wlens))
     except IOError:
         print 'No synthetic emission data found. Re-scanning temperature range.'
@@ -79,7 +76,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'tempe
         width = 0.1
         height = 1.0
         delta_t = logt[1] - logt[0]
-        model = np.memmap(filename=home+'synth_emiss_1pars', dtype='float32',
+        model = np.memmap(filename='synth_emiss_1pars', dtype='float32',
                           mode='w+', shape=(n_temps, n_wlens))
         for t, meantemp in enumerate(temp):
             dem = gaussian(logt, meantemp, width, height)
@@ -102,26 +99,32 @@ def create_tempmap(date, n_params=1, data_dir=None,
                    maps_dir=None, datfile=None):
     wlens = ['094', '131', '171', '193', '211', '335']
     t0 = 5.6
-    images = []
+    images = {}
+    thiswlen = None
 
     f = open(datfile)
 
     # Loop through wavelengths
     for line in f:
-        if line in wlens:
+        if line[:3] in wlens:
             allwlenmaps = []
-            thisline = f.readline()
-            while thisline.strip() not in ['', '\n']:
-                thismap = aiaprep(Map(thisline))
-                thismap.data /= temp_im.exposure_time
-                allwlenmaps.append(thismap)
-                thisline = f.readline()
-            wlenmap = allwlenmaps[-1]
-            for thismap in allwlenmaps[:-1]:
-                wlenmap.data += thismap.data
-            wlenmap.data /= len(allwlenmaps)
-            images.append(wlenmap)
+            thiswlen = line[:3]
+            print 'Loading {} files'.format(thiswlen)
+        elif 'fits' in line:
+            print line
+            thismap = aiaprep(Map(line[:-1]))
+            thismap.data /= thismap.exposure_time
+            allwlenmaps.append(thismap)
+        elif line.strip() in ['', '\n']:
+            if thiswlen:
+                print thiswlen, line
+                wlenmap = allwlenmaps[-1]
+                for thismap in allwlenmaps[:-1]:
+                    wlenmap.data += thismap.data
+                wlenmap.data /= len(allwlenmaps)
+                images[thiswlen] = wlenmap
     
+    images = [images[w] for w in wlens]
     normim = images[2].data.copy()
     # Normalise images to 171A
     print 'Normalising images'
@@ -135,63 +138,6 @@ def create_tempmap(date, n_params=1, data_dir=None,
         pass
 
     return tempmap
-
-
-def calculate_temperatures(date, n_params=1, data_dir=None,
-                            maps_dir=None, n_procs=4):
-    wlens = ['94', '131', '171', '193', '211', '335']
-    # Loop through wavelengths
-    for wl, wlen in enumerate(wlens):
-        fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
-        filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
-        temp_im = Map(filename)
-    n_wlens = len(wlens)
-    temp = np.arange(5.6, 7.01, 0.01)
-    n_temps = len(temp)
-    if n_params == 1:
-        wid = [0.1]
-        hei = [1.0]
-    else:
-        wid = np.arange(0.1, 1.1, 0.1) # Just copying Aschwanden's range here
-        hei = np.arange(15, 31)
-    n_widths = len(wid)
-    n_heights = len(hei)
-    n_vals = n_temps * n_widths * n_heights
-    
-    try:
-        #raise IOError
-        model = np.memmap(filename=home+'synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='r', shape=(n_vals, n_wlens))
-        params = np.loadtxt(home+'gaussian_parameters_{}'.format(n_params))
-    except IOError:
-        resp = load_temp_responses()
-        logt = np.arange(0, 15.05, 0.05)
-        delta_t = logt[1] - logt[0]
-        model = np.memmap(filename=home+'synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='w+', shape=(n_vals, n_wlens))
-        params = np.zeros((n_vals, n_params))
-        # Define linear index in model for this set of parameters
-        i = 0
-        #   For given gaussian width, height and centre:
-        for width in wid:
-            for height in hei:
-                for meantemp in temp:
-                    # For each channel k:
-                    # intensity(k, params) <- sum(temperature_response(k, params) * DEM(params)) * dT
-                    dem = gaussian(logt, float(meantemp), width, height)
-                    model[i, :] = np.sum(resp * dem, axis=1) * delta_t
-                    normmod = model[i, 2]
-                    model[i, :] = model[i, :] / normmod
-                    # Store these parameters for use later
-                    params[i, :] = [meantemp, width, height]
-                    i += 1
-        model.flush()
-        np.savetxt(home+'gaussian_parameters_{}'.format(n_params), params)
-
-    sys('mpirun -np {} -host localhost python parallel_ext.py {}T{} {} {}'.format(
-            n_procs, date.date(), date.time(), n_params, n_vals))
-    
-    return
 
 
 class TemperatureMap(GenericMap):
@@ -223,9 +169,7 @@ class TemperatureMap(GenericMap):
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             if n_params == 3:
-                calculate_temperatures(date, n_params, data_dir, maps_dir, 8)
-                newmap = Map('temp.fits')
-                GenericMap.__init__(self, newmap.data[:, :, 0], newmap.meta)
+                pass
             else:
                 data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile)
                 GenericMap.__init__(self, data, meta)
