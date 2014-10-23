@@ -326,7 +326,7 @@ class TemperatureMap(GenericMap):
     def save(self):
         date = sunpy.time.parse_time(self.date)
         fname = os.path.join(self.maps_dir,
-                             '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+                             '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
@@ -339,7 +339,7 @@ if __name__ == "__main__":
     tmap.save()
     
     image_dir = open(infofile).readline()[:-1]
-    fname = os.path.join(image_dir, '{:%Y-%m-%dT%H:%M:%S}'.format(date))
+    fname = os.path.join(image_dir, '{:%Y-%m-%dT%H_%M_%S}'.format(date))
     
     fig = plt.figure(16, 12)
     tmap.plot()
