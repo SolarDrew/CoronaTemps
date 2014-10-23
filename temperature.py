@@ -332,7 +332,7 @@ class TemperatureMap(GenericMap):
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
 if __name__ == "__main__":
-    date = argv[1]
+    date = sunpy.time.parse_time(argv[1])
     infofile = argv[2]
     
     tmap = TemperatureMap(date, infofile=infofile)
