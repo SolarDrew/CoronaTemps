@@ -23,7 +23,7 @@ try:
 except ImportError:
     print 'Current extension is broken, missing or incompatible.\n'\
         +'Compiling Fortran extension.'
-    sys('f2py -c -m fits /imaps/holly/home/ajl7/CoronaTemps/fitsmodule.f90')
+    sys('f2py -c -m fits fitsmodule.f90')
     from fits import calc_fits
 
 
