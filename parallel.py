@@ -1,13 +1,7 @@
 from os import path
-from mpi4py import MPI
 from sunpy.time import parse_time as parse
 
-comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-
 wlens = ['94', '131', '171', '193', '211', '335']
-r = rank * 2
 
 def download(date):
     date = parse(date)
