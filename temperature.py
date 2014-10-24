@@ -340,6 +340,7 @@ if __name__ == "__main__":
     
     image_dir = open(infofile).readline()[:-1]
     fname = os.path.join(image_dir, '{:%Y-%m-%dT%H_%M_%S}'.format(date))
+    print "Temperature map image saved to: {}".format(fname)
     
     fig = plt.figure(16, 12)
     tmap.plot()
