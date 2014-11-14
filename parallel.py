@@ -1,4 +1,7 @@
-from os import path
+import os
+import glob
+import subprocess
+from time import sleep
 from sunpy.time import parse_time as parse
 
 wlens = ['94', '131', '171', '193', '211', '335']
@@ -6,26 +9,26 @@ wlens = ['94', '131', '171', '193', '211', '335']
 def download(date):
     date = parse(date)
     # Loop through wavelengths
-    for wlen in wlens[r:r+2]:
-        fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
-        filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
-        # Check if file exists
-        if path.isfile(filename):
-            # Need to make sure this doesn't cause hangups
-            continue
+    for w, wlen in enumerate(wlens):
+        data_dir = '/whatever/'
+        fits_dir = os.path.join(data_dir, '{}/{:%Y/%m/%d}/'.format(wlen, date))
+        searchname = os.path.join(fits_dir, '*{:%H:%M}*fits'.format(date))
+        countfiles = glob.glob(searchname)
+        if countfiles == 1:
+            f = open('runfile_{}'.format(w), 'w')
+            f.write("python getdata.py {} {} {}".format(date, wlen, fits_dir))
+            f.close()
         # Download data if not enough found
-        client = vso.VSOClient()
-        if temp_im == []:
-            # Wavelength value for query needs to be an astropy Quantity
-            wquant = u.Quantity(value=int(wlen), unit='Angstrom')
-            qr = client.query(vso.attrs.Time(date,# - dt.timedelta(seconds=6),
-                                             date + dt.timedelta(seconds=12)),#6)),
-                              vso.attrs.Wave(wquant, wquant),
-                              vso.attrs.Instrument('aia'),
-                              vso.attrs.Provider('JSOC'))
-            res = client.get(qr, path=fits_dir+'{file}',site='NSO',
-                             methods=['URL_FILE_Rice']).wait()
+        subprocess.call("qsub runfile_{}".format(w))
 
-
-if __name__ == "__main__":
-    print "Hello from process ", rank, "of ", size
+    running = True
+    iterations = 0
+    while running:
+        if subprocess.check_output('qstat') != '':
+            running = False
+        elif iterations > 7200:
+            
+        sleep(1)
+        iterations += 1
+    
+    return
