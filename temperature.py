@@ -240,11 +240,13 @@ def calculate_emission_measure(tmap, wlen):
         and '211' are most likely to provide reliable results. Use of other
         channels is not recommended.
     """
-    date = tmap.date
+    date = sunpy.time.parse_time(tmap.date)
+    data_dir = tmap.data_dir
     tresp = read(home + 'aia_tresp')
     logt = tresp['logt']
     resp = tresp['resp{}'.format(wlen)]
     tempdata = tmap.data.copy()
+    tempdata[np.isnan(tempdata)] = 0.0
     emmap = sunpy.map.Map(np.ones(tmap.shape)*np.NaN, tmap.meta.copy())
     fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
     filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
@@ -255,6 +257,8 @@ def calculate_emission_measure(tmap, wlen):
     aiamap = aiamap.submap(tmap.xrange, tmap.yrange)
     aiamap.data /= aiamap.exposure_time
     indices = np.round((tempdata - 4.0) / 0.05).astype(int)
+    indices[indices < 0] = 0
+    indices[indices > 100] = 100
     emmap.data = aiamap.data / resp[indices]
     return emmap
 
