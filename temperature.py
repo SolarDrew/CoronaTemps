@@ -243,11 +243,10 @@ def calculate_emission_measure(tmap, wlen):
     date = sunpy.time.parse_time(tmap.date)
     data_dir = tmap.data_dir
     tresp = read(home + 'aia_tresp')
-    logt = tresp['logt']
     resp = tresp['resp{}'.format(wlen)]
     tempdata = tmap.data.copy()
     tempdata[np.isnan(tempdata)] = 0.0
-    emmap = sunpy.map.Map(np.ones(tmap.shape)*np.NaN, tmap.meta.copy())
+    emmap = sunpy.map.Map(tmap.data.copy(), tmap.meta.copy())
     fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
     filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
     aiamap = sunpy.map.Map(filename)
