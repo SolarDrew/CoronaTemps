@@ -130,7 +130,8 @@ def create_tempmap(date, n_params=1, data_dir=None,
     else:
         for wl, wlen in enumerate(wlens):
             fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
-            filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
+            filename = join(fits_dir,
+                            'aia*{0:%Y?%m?%d}?{0:%H?%M}*lev1?fits'.format(date))
             temp_im = Map(filename)
             if isinstance(temp_im, list):
                 temp_im = temp_im[0]
