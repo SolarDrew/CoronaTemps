@@ -128,6 +128,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
     
         images = [images[w] for w in wlens]
     else:
+        images = []
         for wl, wlen in enumerate(wlens):
             fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
             filename = join(fits_dir,
