@@ -41,7 +41,7 @@ def gaussian(x, mean=0.0, std=1.0, amp=1.0):
 
 def load_temp_responses(n_wlens=6, corrections=True):
     resp = np.zeros((n_wlens, 301))
-    tresp = read('~/CoronaTemps/aia_tresp')
+    tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
     resp[0, 80:181] = tresp['resp94']
     resp[1, 80:181] = tresp['resp131']
     resp[2, 80:181] = tresp['resp171']
@@ -169,9 +169,8 @@ class TemperatureMap(GenericMap):
             if maps_dir is None:
                 maps_dir='/media/huw/temperature_maps/{}pars/'.format(n_params)
             
-            fname = join(maps_dir,
-                         '{:%Y/%m/%d}'.format(date),
-                         'temperature/%Y-%m-%dT%H:%M:%S}.fits')
+            maps_dir = join(maps_dir, '{:%Y/%m/%d}/temperature'.format(date))
+            fname = join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
 
         if infofile:
             data_dir = None
@@ -338,8 +337,7 @@ class TemperatureMap(GenericMap):
     
     def save(self):
         date = sunpy.time.parse_time(self.date)
-        fname = os.path.join(self.maps_dir,
-                             '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+        fname = join(self.maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
