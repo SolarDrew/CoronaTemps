@@ -41,10 +41,7 @@ def gaussian(x, mean=0.0, std=1.0, amp=1.0):
 
 def load_temp_responses(n_wlens=6, corrections=True):
     resp = np.zeros((n_wlens, 301))
-    try:
-        tresp = read('aia_tresp')
-    except IOError:
-        tresp = read('/imaps/holly/home/ajl7/aia_tresp')
+    tresp = read('~/CoronaTemps/aia_tresp')
     resp[0, 80:181] = tresp['resp94']
     resp[1, 80:181] = tresp['resp131']
     resp[2, 80:181] = tresp['resp171']
