@@ -169,7 +169,7 @@ class TemperatureMap(GenericMap):
             if maps_dir is None:
                 maps_dir='/media/huw/temperature_maps/{}pars/'.format(n_params)
             
-            maps_dir = join(maps_dir, '{:%Y/%m/%d}/temperature'.format(date))
+            maps_dir = join(maps_dir, '{:%Y/%m/%d}'.format(date))
             fname = join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
 
         if infofile:
