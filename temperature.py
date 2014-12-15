@@ -17,6 +17,7 @@ from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
 from sys import argv
 import os
+from os.path import join
 from os import system as sys
 try:
     from fits import calc_fits
@@ -40,10 +41,7 @@ def gaussian(x, mean=0.0, std=1.0, amp=1.0):
 
 def load_temp_responses(n_wlens=6, corrections=True):
     resp = np.zeros((n_wlens, 301))
-    try:
-        tresp = read('aia_tresp')
-    except IOError:
-        tresp = read('/imaps/holly/home/ajl7/aia_tresp')
+    tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
     resp[0, 80:181] = tresp['resp94']
     resp[1, 80:181] = tresp['resp131']
     resp[2, 80:181] = tresp['resp171']
@@ -99,35 +97,48 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'tempe
 
 
 def create_tempmap(date, n_params=1, data_dir=None,
-                   maps_dir=None, datfile=None):
+                   maps_dir=None, datfile=None, date_first=True):
     wlens = ['094', '131', '171', '193', '211', '335']
     t0 = 5.6
-    images = {}
     thiswlen = None
 
-    f = open(datfile)
-
-    # Loop through wavelengths
-    for line in f:
-        if line[:3] in wlens:
-            allwlenmaps = []
-            thiswlen = line[:3]
-            print 'Loading {} files'.format(thiswlen)
-        elif 'fits' in line:
-            thismap = aiaprep(Map(line[:-1]))
-            thismap.data /= thismap.exposure_time
-            allwlenmaps.append(thismap)
-        elif line.strip() in ['', '\n']:
-            if thiswlen:
-                wlenmap = allwlenmaps[-1]
-                for thismap in allwlenmaps[:-1]:
-                    wlenmap.data += thismap.data
-                wlenmap.data /= len(allwlenmaps)
-                images[thiswlen] = wlenmap
+    if datfile:
+        images = {}
+        f = open(datfile)
+        # Loop through wavelengths
+        for line in f:
+            if line[:3] in wlens:
+                allwlenmaps = []
+                thiswlen = line[:3]
+                print 'Loading {} files'.format(thiswlen)
+            elif 'fits' in line:
+                thismap = aiaprep(Map(line[:-1]))
+                thismap.data /= thismap.exposure_time
+                allwlenmaps.append(thismap)
+            elif line.strip() in ['', '\n']:
+                if thiswlen:
+                    wlenmap = allwlenmaps[-1]
+                    for thismap in allwlenmaps[:-1]:
+                        wlenmap.data += thismap.data
+                    wlenmap.data /= len(allwlenmaps)
+                    images[thiswlen] = wlenmap
     
-    images = [images[w] for w in wlens]
-    normim = images[2].data.copy()
+        images = [images[w] for w in wlens]
+    else:
+        images = []
+        for wl, wlen in enumerate(wlens):
+            fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
+            filename = join(fits_dir,
+                            'aia*{0:%Y?%m?%d}?{0:%H?%M}*lev1?fits'.format(date))
+            temp_im = Map(filename)
+            if isinstance(temp_im, list):
+                temp_im = temp_im[0]
+            temp_im = aiaprep(temp_im)
+            temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+            images.append(temp_im)
+
     # Normalise images to 171A
+    normim = images[2].data.copy()
     print 'Normalising images'
     for i in range(len(wlens)):
         images[i].data /= normim
@@ -158,12 +169,13 @@ class TemperatureMap(GenericMap):
             if maps_dir is None:
                 maps_dir='/media/huw/temperature_maps/{}pars/'.format(n_params)
             
-            fname = maps_dir+'data/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date)
+            maps_dir = join(maps_dir, '{:%Y/%m/%d}'.format(date))
+            fname = join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
 
         if infofile:
             data_dir = None
             maps_dir = open(infofile).readline()[:-1]
-            fname = os.path.join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+            fname = join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
             fname.replace('/images/', '/data/')
 
         try:
