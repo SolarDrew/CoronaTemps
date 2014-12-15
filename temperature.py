@@ -325,6 +325,8 @@ class TemperatureMap(GenericMap):
     
     def save(self):
         date = sunpy.time.parse_time(self.date)
+        if not os.path.exists(self.maps_dir):
+            os.makedirs(self.maps_dir)
         fname = os.path.join(self.maps_dir,
                              '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
