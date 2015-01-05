@@ -19,6 +19,8 @@ from sys import argv
 import os
 from os.path import join
 from os import system as sys
+import datetime as dt
+from sunpy.time.timerange import TimeRange as tr
 try:
     from fits import calc_fits
 except ImportError:
@@ -127,15 +129,20 @@ def create_tempmap(date, n_params=1, data_dir=None,
     else:
         images = []
         for wl, wlen in enumerate(wlens):
-            fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
-            filename = join(fits_dir,
-                            'aia*{0:%Y?%m?%d}?{0:%H?%M}*lev1?fits'.format(date))
-            temp_im = Map(filename)
-            if isinstance(temp_im, list):
-                temp_im = temp_im[0]
-            temp_im = aiaprep(temp_im)
-            temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
-            images.append(temp_im)
+            timerange = tr(date - dt.timedelta(seconds=6),
+                           date + dt.timedelta(seconds=11))
+            ntimes = int(timerange.seconds())
+            times = [time.start() for time in timerange.split(ntimes)]
+            for time in times:
+                fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
+                filename = join(fits_dir,
+                    'aia*{0:%Y?%m?%d}?{0:%H?%M}*lev1?fits'.format(date))
+                    if os.path.exists(filename):
+                        temp_im = aiaprep(Map(filename))
+                        temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+                        images.append(temp_im)
+                        break
+        print len(images)
 
     # Normalise images to 171A
     normim = images[2].data.copy()
