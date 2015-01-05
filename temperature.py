@@ -135,9 +135,9 @@ def create_tempmap(date, n_params=1, data_dir=None,
             times = [time.start() for time in timerange.split(ntimes)]
             #print times
             for time in times:
-                fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
+                fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
                 filename = join(fits_dir,
-                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(date))
+                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                 if os.path.exists(filename):
                     print "File found"
                     temp_im = aiaprep(Map(filename))
