@@ -136,8 +136,9 @@ def create_tempmap(date, n_params=1, data_dir=None,
             for time in times:
                 fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
                 filename = join(fits_dir,
-                    'aia*{0:%Y?%m?%d}?{0:%H?%M}*lev1?fits'.format(date))
+                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(date))
                 if os.path.exists(filename):
+                    print "File found"
                     temp_im = aiaprep(Map(filename))
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                     images.append(temp_im)
