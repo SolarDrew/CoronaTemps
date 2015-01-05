@@ -143,6 +143,8 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                     images.append(temp_im)
                     break
+                else:
+                    print "file not found for ", date
         print len(images)
 
     # Normalise images to 171A
