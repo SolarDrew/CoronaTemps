@@ -133,6 +133,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                            date + dt.timedelta(seconds=11))
             ntimes = int(timerange.seconds())
             times = [time.start() for time in timerange.split(ntimes)]
+            print times
             for time in times:
                 fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
                 filename = join(fits_dir,
