@@ -128,6 +128,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
         images = [images[w] for w in wlens]
     else:
         images = []
+        print date
         for wl, wlen in enumerate(wlens):
             timerange = tr(date - dt.timedelta(seconds=6),
                            date + dt.timedelta(seconds=11))
@@ -138,6 +139,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                 fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
                 filename = join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
+                print os.file.exists(filename)
                 if os.path.exists(filename):
                     print "File found"
                     temp_im = aiaprep(Map(filename))
@@ -145,7 +147,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     images.append(temp_im)
                     break
                 else:
-                    print "file not found for ", time, "and", wlen, filename
+                    print filename, "not found"
         print len(images)
 
     # Normalise images to 171A
