@@ -145,7 +145,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     images.append(temp_im)
                     break
                 else:
-                    print "file not found for ", date
+                    print "file not found for ", date, "and", wlen
         print len(images)
 
     # Normalise images to 171A
