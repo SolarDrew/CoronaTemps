@@ -140,7 +140,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                 filelist = glob.glob(filename)
                 if filelist != []:
-                    print "File found"
+                    #print "File found"
                     temp_im = aiaprep(Map(filelist[0]))
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                     images.append(temp_im)
