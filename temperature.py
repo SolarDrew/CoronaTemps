@@ -129,9 +129,8 @@ def create_tempmap(date, n_params=1, data_dir=None,
         images = [images[w] for w in wlens]
     else:
         images = []
-        print date
         for wl, wlen in enumerate(wlens):
-            timerange = tr(date - dt.timedelta(seconds=6),
+            timerange = tr(date - dt.timedelta(seconds=4),
                            date + dt.timedelta(seconds=11))
             ntimes = int(timerange.seconds())
             times = [time.start() for time in timerange.split(ntimes)]
@@ -148,7 +147,6 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     break
                 else:
                     print filename, "not found"
-        print len(images)
 
     # Normalise images to 171A
     normim = images[2].data.copy()
