@@ -21,6 +21,7 @@ from os.path import join
 from os import system as sys
 import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
+import glob
 try:
     from fits import calc_fits
 except ImportError:
@@ -134,15 +135,14 @@ def create_tempmap(date, n_params=1, data_dir=None,
                            date + dt.timedelta(seconds=11))
             ntimes = int(timerange.seconds())
             times = [time.start() for time in timerange.split(ntimes)]
-            #print times
             for time in times:
                 fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
                 filename = join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
-                print os.path.exists(filename)
-                if os.path.exists(filename):
+                filelist = glob.glob(filename)
+                if filelist != []:
                     print "File found"
-                    temp_im = aiaprep(Map(filename))
+                    temp_im = aiaprep(Map(filelist[0]))
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                     images.append(temp_im)
                     break
