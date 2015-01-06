@@ -146,7 +146,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     images.append(temp_im)
                     break
                 else:
-                    print filename, "not found"
+                    pass
 
     # Normalise images to 171A
     normim = images[2].data.copy()
