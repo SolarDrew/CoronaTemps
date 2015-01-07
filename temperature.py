@@ -129,24 +129,30 @@ def create_tempmap(date, n_params=1, data_dir=None,
         images = [images[w] for w in wlens]
     else:
         images = []
+        imagefiles = []
         for wl, wlen in enumerate(wlens):
-            timerange = tr(date - dt.timedelta(seconds=4),
+            timerange = tr(date - dt.timedelta(seconds=5),
                            date + dt.timedelta(seconds=11))
             ntimes = int(timerange.seconds())
             times = [time.start() for time in timerange.split(ntimes)]
             for time in times:
-                fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
+                #fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
+                fits_dir = join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
                 filename = join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                 filelist = glob.glob(filename)
                 if filelist != []:
                     #print "File found"
+                    imagefiles.append(filelist[0])
                     temp_im = aiaprep(Map(filelist[0]))
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                     images.append(temp_im)
                     break
                 else:
                     pass
+    #print len(images)
+    #for i in imagefiles:
+    #    print i
 
     # Normalise images to 171A
     normim = images[2].data.copy()
