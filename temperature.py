@@ -255,7 +255,7 @@ class TemperatureMap(GenericMap):
         elif scale == 'linear':
             self.data = (10.0 ** self.data) / 1.0e6
         elif scale == 'log':
-            self.data = np.log(self.data)
+            self.data = np.log10(self.data)
         
         self.temperature_scale = scale
         return
