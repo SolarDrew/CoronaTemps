@@ -199,7 +199,7 @@ class TemperatureMap(GenericMap):
             if not os.path.exists(fname):
                 sys("gunzip {}.gz".format(fname))
             newmap = Map(fname)
-            sys("gzip {}".format(fname))
+            sys("gzip {} -f".format(fname))
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             if n_params == 3:
@@ -362,7 +362,7 @@ class TemperatureMap(GenericMap):
         fname = os.path.join(self.maps_dir,
                              '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
-        sys("gzip {}".format(fname))
+        sys("gzip {} -f".format(fname))
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
