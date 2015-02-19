@@ -196,8 +196,8 @@ class TemperatureMap(GenericMap):
             fname.replace('/images/', '/data/')
 
         try:
-            if not os.path.exists(fname):
-                sys("gunzip {}.gz".format(fname))
+            #if not os.path.exists(fname):
+            #    sys("gunzip {}.gz".format(fname))
             newmap = Map(fname)
             sys("gzip {} -f".format(fname))
             GenericMap.__init__(self, newmap.data, newmap.meta)
@@ -355,14 +355,15 @@ class TemperatureMap(GenericMap):
         
         return
     
-    def save(self, compress=True):
+    def save(self, compress=False):
         date = sunpy.time.parse_time(self.date)
         if not os.path.exists(self.maps_dir):
             os.makedirs(self.maps_dir)
         fname = os.path.join(self.maps_dir,
                              '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
-        sys("gzip {} -f".format(fname))
+        if compress:
+            sys("gzip {} -f".format(fname))
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
