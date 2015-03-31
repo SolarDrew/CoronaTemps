@@ -12,6 +12,7 @@ from matplotlib import cm
 from matplotlib import patches
 import numpy as np
 import sunpy
+from sunpy.net import vso
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
@@ -24,10 +25,11 @@ from sunpy.time.timerange import TimeRange as tr
 import glob
 try:
     from fits import calc_fits
+    print 'Fortran extension imported successfully'
 except ImportError:
     print 'Current extension is broken, missing or incompatible.\n'\
         +'Compiling Fortran extension.'
-    sys('f2py -c -m fits fitsmodule.f90')
+    sys('f2py -c -m fits /imaps/holly/home/ajl7/CoronaTemps/fitsmodule.f90')
     from fits import calc_fits
 
 
@@ -100,10 +102,13 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'tempe
 
 
 def create_tempmap(date, n_params=1, data_dir=None,
-                   maps_dir=None, datfile=None, date_first=True):
+                   maps_dir=None, datfile=None, date_first=True,
+                   submap=None):
     wlens = ['094', '131', '171', '193', '211', '335']
     t0 = 5.6
     thiswlen = None
+    client = vso.VSOClient()
+    print submap
 
     if datfile:
         images = {}
@@ -136,8 +141,8 @@ def create_tempmap(date, n_params=1, data_dir=None,
             ntimes = int(timerange.seconds())
             times = [time.start() for time in timerange.split(ntimes)]
             for time in times:
-                #fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
-                fits_dir = join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
+                fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
+                #fits_dir = join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
                 filename = join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                 filelist = glob.glob(filename)
@@ -145,11 +150,28 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     #print "File found"
                     imagefiles.append(filelist[0])
                     temp_im = aiaprep(Map(filelist[0]))
+                    if submap:
+                        temp_im = temp_im.submap(*submap)
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                     images.append(temp_im)
                     break
                 else:
                     pass
+            if len(images) < wl+1:
+                print 'File not found. Downloading from VSO...'
+                qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
+                                  vso.attrs.Wave(wlen, wlen),
+                                  vso.attrs.Instrument('aia'),
+                                  vso.attrs.Provider('JSOC'))
+                res = client.get(qr, path=join(fits_dir, '{file}'), site='NSO').wait()
+                if isinstance(res, list): res = res[0]
+                imagefiles.append(res)
+                temp_im = aiaprep(Map(res))
+                if submap:
+                    temp_im = temp_im.submap(*submap)
+                temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+                images.append(temp_im)
+
     #print len(images)
     #for i in imagefiles:
     #    print i
@@ -171,7 +193,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
 
 class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
-                 fname=None, infofile=None):
+                 fname=None, infofile=None, submap=None):
         if (not fname and not date) or (fname and date):
             print """"You must specify either a date and time for which to create
                 temperatures or the name of a file containing a valid 
@@ -199,13 +221,14 @@ class TemperatureMap(GenericMap):
             #if not os.path.exists(fname):
             #    sys("gunzip {}.gz".format(fname))
             newmap = Map(fname)
-            sys("gzip {} -f".format(fname))
+            #sys("gzip {} -f".format(fname))
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             if n_params == 3:
                 pass
             else:
-                data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile)
+                print submap
+                data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap)
                 GenericMap.__init__(self, data, meta)
                 centre_x = self.reference_pixel['x']
                 centre_y = self.reference_pixel['y']
@@ -355,15 +378,16 @@ class TemperatureMap(GenericMap):
         
         return
     
-    def save(self, compress=False):
+    def save(self):#, compress=False):
         date = sunpy.time.parse_time(self.date)
         if not os.path.exists(self.maps_dir):
             os.makedirs(self.maps_dir)
         fname = os.path.join(self.maps_dir,
                              '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+        print fname
         GenericMap.save(self, fname, clobber=True)
-        if compress:
-            sys("gzip {} -f".format(fname))
+        #if compress:
+        #    sys("gzip {} -f".format(fname))
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
