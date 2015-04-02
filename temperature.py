@@ -152,7 +152,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     #print "File found"
                     imagefiles.append(filelist[0])
                     temp_im = Map(filelist[0])
-                    print wlen, temp_im.shape,
+                    #print wlen, temp_im.shape,
                     temp_im = aiaprep(temp_im)#Map(filelist[0]))
                     if submap:
                         temp_im = temp_im.submap(*submap)
@@ -175,7 +175,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     temp_im = temp_im.submap(*submap)
                 temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                 images.append(temp_im)
-            print temp_im.shape
+            print wlen, temp_im.min(), temp_im.max()
             plt.sca(ax[wl])
             temp_im.plot()
         allwls_dir = maps_dir.replace('temperature/', 'allwlens/')
@@ -242,16 +242,15 @@ class TemperatureMap(GenericMap):
                 print submap
                 data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap)
                 GenericMap.__init__(self, data, meta)
-                centre_x = self.reference_pixel['x']
-                centre_y = self.reference_pixel['y']
-                print 'temp', self.shape
-                lowx, highx = self.xrange
-                lowy, highy = self.yrange
-                print 'x', lowx, highx
-                print 'y', lowy, highy
+                print 'temp', self.min(), self.max()
+                lowx, highx = (self.xrange[0] / self.scale['x'],
+                               self.xrange[1] / self.scale['x'])
+                lowy, highy = (self.yrange[0] / self.scale['y'],
+                               self.yrange[1] / self.scale['y'])
                 x_grid, y_grid = np.mgrid[lowx:highx-1, lowy:highy-1]
                 r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
-                self.data[r_grid > centre_x * 1.15] = None
+                outer_rad = (self.rsun_arcseconds * 1.5) / self.scale['x']
+                self.data[r_grid > outer_rad] = None
 
         self.meta['date-obs'] = str(date)
         self.data_dir = data_dir
