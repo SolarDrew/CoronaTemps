@@ -322,13 +322,13 @@ def calculate_temperatures(date, n_params=1, data_dir=home+'SDO_data/',
 class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
                  fname=None):
-        if (not fname and not date) or (fname and date):
+        if (not fname and not date):# or (fname and date):
             print """"You must specify either a date and time for which to create
                 temperatures or the name of a file containing a valid 
                 TemperatureMap object."""
             return
 
-        if date:
+        if date and not fname:
             date = sunpy.time.parse_time(date)
         
             if data_dir is None:
