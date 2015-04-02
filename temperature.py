@@ -135,6 +135,8 @@ def create_tempmap(date, n_params=1, data_dir=None,
     else:
         images = []
         imagefiles = []
+        aiafig, ax = plt.subplots(2, 3, figsize=(32, 16))
+        ax = ax.flatten()
         for wl, wlen in enumerate(wlens):
             timerange = tr(date - dt.timedelta(seconds=5),
                            date + dt.timedelta(seconds=11))
@@ -149,7 +151,9 @@ def create_tempmap(date, n_params=1, data_dir=None,
                 if filelist != []:
                     #print "File found"
                     imagefiles.append(filelist[0])
-                    temp_im = aiaprep(Map(filelist[0]))
+                    temp_im = Map(filelist[0])
+                    print wlen, temp_im.shape,
+                    temp_im = aiaprep(temp_im)#Map(filelist[0]))
                     if submap:
                         temp_im = temp_im.submap(*submap)
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
@@ -171,6 +175,14 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     temp_im = temp_im.submap(*submap)
                 temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                 images.append(temp_im)
+            print temp_im.shape
+            plt.sca(ax[wl])
+            temp_im.plot()
+        allwls_dir = maps_dir.replace('temperature/', 'allwlens/')
+        if not os.path.exists(allwls_dir):
+            os.makedirs(allwls_dir)
+        fname = join(allwls_dir, '{:%Y-%m-%dT%H_%M_%S}'.format(date))
+        plt.savefig(fname)
 
     #print len(images)
     #for i in imagefiles:
@@ -228,11 +240,16 @@ class TemperatureMap(GenericMap):
                 pass
             else:
                 print submap
-                data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap)
+                data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap)
                 GenericMap.__init__(self, data, meta)
                 centre_x = self.reference_pixel['x']
                 centre_y = self.reference_pixel['y']
-                x_grid, y_grid = np.mgrid[-centre_x:centre_x-1, -centre_y:centre_y-1]
+                print 'temp', self.shape
+                lowx, highx = self.xrange
+                lowy, highy = self.yrange
+                print 'x', lowx, highx
+                print 'y', lowy, highy
+                x_grid, y_grid = np.mgrid[lowx:highx-1, lowy:highy-1]
                 r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
                 self.data[r_grid > centre_x * 1.15] = None
 
