@@ -8,7 +8,7 @@ Created on Thu Jun  5 15:15:09 2014
 from matplotlib import use
 use('agg')
 import matplotlib.pyplot as plt
-from matplotlib import cm
+from matplotlib import cm, _cm
 from matplotlib import patches
 import numpy as np
 import sunpy
@@ -16,7 +16,7 @@ from sunpy.net import vso
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
-from sys import argv
+from sys import argv, version_info
 import os
 from os.path import join
 from os import system as sys
@@ -31,6 +31,8 @@ except ImportError:
         +'Compiling Fortran extension.'
     sys('f2py -c -m fits /imaps/holly/home/ajl7/CoronaTemps/fitsmodule.f90')
     from fits import calc_fits
+import astropy
+import skimage
 
 
 def gaussian(x, mean=0.0, std=1.0, amp=1.0):
@@ -72,7 +74,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'tempe
     try:
         if force_temp_scan:
             raise IOError
-        model = np.memmap(filename='synth_emiss_1pars', dtype='float32',
+        model = np.memmap(filename='/imaps/holly/home/ajl7/synth_emiss_1pars', dtype='float32',
                           mode='r', shape=(n_temps, n_wlens))
     except IOError:
         print 'No synthetic emission data found. Re-scanning temperature range.'
@@ -82,7 +84,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'tempe
         width = 0.1
         height = 1.0
         delta_t = logt[1] - logt[0]
-        model = np.memmap(filename='synth_emiss_1pars', dtype='float32',
+        model = np.memmap(filename='/imaps/holly/home/ajl7/synth_emiss_1pars', dtype='float32',
                           mode='w+', shape=(n_temps, n_wlens))
         for t, meantemp in enumerate(temp):
             dem = gaussian(logt, meantemp, width, height)
@@ -108,7 +110,6 @@ def create_tempmap(date, n_params=1, data_dir=None,
     t0 = 5.6
     thiswlen = None
     client = vso.VSOClient()
-    print submap
 
     if datfile:
         images = {}
@@ -141,17 +142,13 @@ def create_tempmap(date, n_params=1, data_dir=None,
             ntimes = int(timerange.seconds())
             times = [time.start() for time in timerange.split(ntimes)]
             for time in times:
-                fits_dir = join(data_dir, '{:%Y/%m/%d}/{}'.format(time, wlen))
-                #fits_dir = join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
+                fits_dir = join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
                 filename = join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                 filelist = glob.glob(filename)
                 if filelist != []:
-                    #print "File found"
                     imagefiles.append(filelist[0])
-                    temp_im = Map(filelist[0])
-                    #print wlen, temp_im.shape,
-                    temp_im = aiaprep(temp_im)#Map(filelist[0]))
+                    temp_im = aiaprep(Map(filelist[0]))
                     if submap:
                         temp_im = temp_im.submap(*submap)
                     temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
@@ -173,10 +170,6 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     temp_im = temp_im.submap(*submap)
                 temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                 images.append(temp_im)
-
-    #print len(images)
-    #for i in imagefiles:
-    #    print i
 
     # Normalise images to 171A
     normim = images[2].data.copy()
@@ -229,10 +222,8 @@ class TemperatureMap(GenericMap):
             if n_params == 3:
                 pass
             else:
-                print submap
                 data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap)
                 GenericMap.__init__(self, data, meta)
-                print 'temp', self.min(), self.max()
                 lowx, highx = (self.xrange[0] / self.scale['x'],
                                self.xrange[1] / self.scale['x'])
                 lowy, highy = (self.yrange[0] / self.scale['y'],
@@ -242,11 +233,15 @@ class TemperatureMap(GenericMap):
                 outer_rad = (self.rsun_arcseconds * 1.5) / self.scale['x']
                 self.data[r_grid > outer_rad] = None
 
+        tmapcubehelix = _cm.cubehelix(s=2.8, r=0.7, h=2.0, gamma=1.0)
+        cm.register_cmap(name='temphelix', data=tmapcubehelix)
+        self.cmap = cm.get_cmap('temphelix')
+
         self.meta['date-obs'] = str(date)
         self.data_dir = data_dir
         self.maps_dir = maps_dir
         self.temperature_scale = 'log'
-        self.cmap = cm.coolwarm
+        #self.cmap = cm.coolwarm
         self.region = None
         self.region_coordinate = {'x': 0.0, 'y': 0.0}
         if n_params == 3:
@@ -278,12 +273,11 @@ class TemperatureMap(GenericMap):
         """
         Function to highlight user-defined temperatures
         """
-        splitmap = TemperatureMap(np.ones(self.data.shape)*np.NaN,
-                                  self.meta.copy())
+        newdata = np.ones(self.data.shape) * np.NaN
         indices = np.where((self.data > mintemp) * (self.data < maxtemp))
-        splitmap.data[indices] = splitmap.data[indices]
+        newdata[indices] = self.data[indices]
         
-        return splitmap
+        return Map(newdata, self.meta.copy())
     
     def convert_scale(self, scale='linear'):
         if self.temperature_scale == scale:
@@ -390,7 +384,6 @@ class TemperatureMap(GenericMap):
             os.makedirs(self.maps_dir)
         fname = os.path.join(self.maps_dir,
                              '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
-        print fname
         GenericMap.save(self, fname, clobber=True)
         #if compress:
         #    sys("gzip {} -f".format(fname))
