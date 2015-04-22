@@ -18,7 +18,7 @@ from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
 from sys import argv, version_info
 import os
-from os.path import join
+from os.path import join, exists
 from os import system as sys
 import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
@@ -96,6 +96,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'tempe
     ims_array = np.array([im.data for im in images])
     print 'Calculating temperature values...',
     temps, fits = calc_fits(ims_array, model, temp, n_temps, n_wlens, x, y, 1)
+    temps[temps == 0] = np.nan
     print 'Done.'
     tempmap = temps[:, :, 0], images[2].meta.copy(), fits
     # TODO: figure out how to change things in the header and save them.
@@ -137,25 +138,18 @@ def create_tempmap(date, n_params=1, data_dir=None,
         images = []
         imagefiles = []
         for wl, wlen in enumerate(wlens):
-            timerange = tr(date - dt.timedelta(seconds=5),
-                           date + dt.timedelta(seconds=11))
-            ntimes = int(timerange.seconds())
-            times = [time.start() for time in timerange.split(ntimes)]
-            for time in times:
-                fits_dir = join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
-                filename = join(fits_dir,
-                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
-                filelist = glob.glob(filename)
-                if filelist != []:
-                    imagefiles.append(filelist[0])
-                    temp_im = aiaprep(Map(filelist[0]))
-                    if submap:
-                        temp_im = temp_im.submap(*submap)
-                    temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
-                    images.append(temp_im)
-                    break
-                else:
-                    pass
+            fits_dir = join(data_dir, '{}'.format(wlen))
+            filename = join(fits_dir,
+                'AIA{0:%Y%m%d}?{0:%H%M}*fits'.format(date))
+            filelist = glob.glob(filename)
+            if filelist != []:
+                imagefiles.append(filelist[0])
+                temp_im = Map(filelist[0])
+                #temp_im = aiaprep(Map(filelist[0])) # Not necessary, already lvl 1.5
+                if submap:
+                    temp_im = temp_im.submap(*submap)
+                temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+                images.append(temp_im)
             if len(images) < wl+1:
                 print 'File not found. Downloading from VSO...'
                 qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
@@ -424,6 +418,18 @@ class TemperatureMap(GenericMap):
         GenericMap.save(self, fname, clobber=True)
         #if compress:
         #    sys("gzip {} -f".format(fname))
+
+    def min(self):
+        return np.nanmin(self.data)
+
+    def mean(self):
+        return np.nanmean(self.data, dtype='float64')
+
+    def max(self):
+        return np.nanmax(self.data)
+
+    def std(self):
+        return np.nanstd(self.data, dtype='float64')
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
