@@ -186,6 +186,43 @@ def create_tempmap(date, n_params=1, data_dir=None,
     return tempmap
 
 
+def calculate_emission_measure(tmap, wlen):
+    """
+    Calculate an approximation of the emission measure using a given
+    TemperatureMap object and a particular AIA channel.
+    
+    Parameters
+    ----------
+    tmap : CoronaTemps.temperature.TemperatureMap
+        A TemperatureMap instance containing coronal
+        temperature data
+    wlen : {'94' | '131' | '171' | '193' | '211' | '335'}
+        AIA wavelength used to approximate the emission measure. '171', '193'
+        and '211' are most likely to provide reliable results. Use of other
+        channels is not recommended.
+    """
+    date = sunpy.time.parse_time(tmap.date)
+    data_dir = tmap.data_dir
+    tresp = read(home + 'aia_tresp')
+    resp = tresp['resp{}'.format(wlen)]
+    tempdata = tmap.data.copy()
+    tempdata[np.isnan(tempdata)] = 0.0
+    emmap = sunpy.map.Map(tmap.data.copy(), tmap.meta.copy())
+    fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
+    filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
+    aiamap = sunpy.map.Map(filename)
+    if isinstance(aiamap, list):
+        aiamap = aiamap[0]
+    aiamap = aiaprep(aiamap)
+    aiamap = aiamap.submap(tmap.xrange, tmap.yrange)
+    aiamap.data /= aiamap.exposure_time
+    indices = np.round((tempdata - 4.0) / 0.05).astype(int)
+    indices[indices < 0] = 0
+    indices[indices > 100] = 100
+    emmap.data = aiamap.data / resp[indices]
+    return emmap
+
+
 class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
                  fname=None, infofile=None, submap=None):
