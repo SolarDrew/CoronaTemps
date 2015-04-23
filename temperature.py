@@ -180,9 +180,9 @@ def create_tempmap(date, n_params=1, data_dir=None,
     return tempmap
 
 
-def emission_measure(tmap, wlen='171', dz=100):
+def calculate_density(tmap, wlen='171', dz=100):
     """
-    Calculate an approximation of the emission measure using a given
+    Calculate an approximation of the coronal average LOS density using a given
     TemperatureMap object and a particular AIA channel.
     
     Parameters
@@ -194,6 +194,7 @@ def emission_measure(tmap, wlen='171', dz=100):
         and '211' are most likely to provide reliable results. Use of other
         channels is not recommended.
     """
+    # TODO: Make this a method of the TemperatureMap class
     # Load the appropriate temperature response function
     tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
     resp = tresp['resp{}'.format(wlen)]
@@ -216,15 +217,15 @@ def emission_measure(tmap, wlen='171', dz=100):
     aiamap = aiaprep(aiamap)
     aiamap = aiamap.submap(tmap.xrange, tmap.yrange)
 
-    # Create new Map and put emission measure values in it
-    emmap = Map(tmap.data.copy(), tmap.meta.copy())
+    # Create new Map and put density values in it
+    dmap = Map(tmap.data.copy(), tmap.meta.copy())
     indices = np.round((tempdata - 4.0) / 0.05).astype(int)
     print len(resp)
     print indices
     indices[indices < 0] = 0
     indices[indices > 100] = 100
     print indices
-    emmap.data = np.sqrt(aiamap.data / resp[indices]) / dz
+    dmap.data = np.sqrt(aiamap.data / resp[indices]) / dz
 
     return emmap
 
