@@ -180,7 +180,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
     return tempmap
 
 
-def calculate_emission_measure(tmap, wlen):
+def emission_measure(tmap, wlen='171', dz=100):
     """
     Calculate an approximation of the emission measure using a given
     TemperatureMap object and a particular AIA channel.
@@ -188,32 +188,44 @@ def calculate_emission_measure(tmap, wlen):
     Parameters
     ----------
     tmap : CoronaTemps.temperature.TemperatureMap
-        A TemperatureMap instance containing coronal
-        temperature data
+        A TemperatureMap instance containing coronal temperature data
     wlen : {'94' | '131' | '171' | '193' | '211' | '335'}
         AIA wavelength used to approximate the emission measure. '171', '193'
         and '211' are most likely to provide reliable results. Use of other
         channels is not recommended.
     """
-    date = sunpy.time.parse_time(tmap.date)
-    data_dir = tmap.data_dir
-    tresp = read(home + 'aia_tresp')
+    # Load the appropriate temperature response function
+    tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
     resp = tresp['resp{}'.format(wlen)]
+
+    # Get some information from the TemperatureMap and set up filenames, etc
     tempdata = tmap.data.copy()
     tempdata[np.isnan(tempdata)] = 0.0
-    emmap = sunpy.map.Map(tmap.data.copy(), tmap.meta.copy())
-    fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
-    filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
-    aiamap = sunpy.map.Map(filename)
-    if isinstance(aiamap, list):
-        aiamap = aiamap[0]
+    date = sunpy.time.parse_time(tmap.date)
+    data_dir = tmap.data_dir
+    fits_dir = join(data_dir, '{}'.format(wlen))
+    filename = join(fits_dir, 'AIA{0:%Y%m%d}?{0:%H%M}*fits'.format(date))
+
+    # Load and appropriately process AIA data
+    filelist = glob.glob(filename)
+    if filelist == []:
+        print 'AIA data not found :('
+        return
+    aiamap = Map(filename)
+    aiamap.data /= aiamap.exposure_time
     aiamap = aiaprep(aiamap)
     aiamap = aiamap.submap(tmap.xrange, tmap.yrange)
-    aiamap.data /= aiamap.exposure_time
+
+    # Create new Map and put emission measure values in it
+    emmap = Map(tmap.data.copy(), tmap.meta.copy())
     indices = np.round((tempdata - 4.0) / 0.05).astype(int)
+    print len(resp)
+    print indices
     indices[indices < 0] = 0
     indices[indices > 100] = 100
-    emmap.data = aiamap.data / resp[indices]
+    print indices
+    emmap.data = np.sqrt(aiamap.data / resp[indices]) / dz
+
     return emmap
 
 
@@ -244,10 +256,7 @@ class TemperatureMap(GenericMap):
             fname.replace('/images/', '/data/')
 
         try:
-            #if not os.path.exists(fname):
-            #    sys("gunzip {}.gz".format(fname))
             newmap = Map(fname)
-            #sys("gzip {} -f".format(fname))
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             if n_params == 3:
