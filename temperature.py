@@ -16,10 +16,9 @@ from sunpy.net import vso
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
-from sys import argv, version_info
-import os
-from os.path import join
-from os import system as sys
+from sys import argv
+from os import path
+from os import system
 import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
 import glob
@@ -31,8 +30,9 @@ except ImportError:
         +'Compiling Fortran extension.'
     sys('f2py -c -m fits /imaps/holly/home/ajl7/CoronaTemps/fitsmodule.f90')
     from fits import calc_fits
-import astropy
-import skimage
+
+
+home = path.expanduser('~')
 
 
 def gaussian(x, mean=0.0, std=1.0, amp=1.0):
@@ -48,7 +48,7 @@ def gaussian(x, mean=0.0, std=1.0, amp=1.0):
 
 def load_temp_responses(n_wlens=6, corrections=True):
     resp = np.zeros((n_wlens, 301))
-    tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
+    tresp = read('{}/CoronaTemps/aia_tresp'.format(home))
     resp[0, 80:181] = tresp['resp94']
     resp[1, 80:181] = tresp['resp131']
     resp[2, 80:181] = tresp['resp171']
@@ -65,37 +65,47 @@ def load_temp_responses(n_wlens=6, corrections=True):
     return resp
 
 
-def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None):#home+'temperature_maps/'):
+def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, verbose=False):
+    # Get dimensions of image
     x, y = images[0].shape
     n_wlens = len(images)
-    n_temps = int((7.0 - t0) / 0.01) + 1
     temp = np.arange(t0, 7.01, 0.01)
+    if n_params == 1:
+        # Assume a width of the gaussian DEM distribution and normalise the height
+        widths = [0.1]
+        heights = [1.0]
+    else:
+        widths = np.arange(0.1, 1.1, 0.1)
+        heights = np.arange(20, 35, 2)
+        # TODO: check if either of the above are sensible ranges of numbers
+        # TODO: think about how having a height other than 1 impacts the decision to normalise everything
+    n_temps, n_widths, n_heights = len(temp), len(widths), len(heights)
+    shape = n_temps, n_widths, n_heights, n_wlens
     
     try:
         if force_temp_scan:
             raise IOError
-        model = np.memmap(filename='/imaps/holly/home/ajl7/synth_emiss_1pars', dtype='float32',
-                          mode='r', shape=(n_temps, n_wlens))
+        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+                          dtype='float32', mode='r', shape=(*shape))
     except IOError:
-        print 'No synthetic emission data found. Re-scanning temperature range.'
+        if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
         resp = load_temp_responses()
         logt = np.arange(0, 15.05, 0.05)
-        # Assume a width of the gaussian DEM distribution and normalise the height
-        width = 0.1
-        height = 1.0
         delta_t = logt[1] - logt[0]
-        model = np.memmap(filename='/imaps/holly/home/ajl7/synth_emiss_1pars', dtype='float32',
-                          mode='w+', shape=(n_temps, n_wlens))
+        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+                          dtype='float32', mode='w+', shape=(*shape))
         for t, meantemp in enumerate(temp):
-            dem = gaussian(logt, meantemp, width, height)
-            f = resp * dem
-            model[t, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
-            normmod = model[t, 2]
-            model[t, :] = model[t, :] / normmod
+            for w, width in widths:
+                for h, height in heights:
+                    dem = gaussian(logt, meantemp, width, height)
+                    f = resp * dem
+                    model[t, w, h, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
+                    normmod = model[t, w, h, 2]
+                    model[t, w, h, :] /= normmod
         model.flush()
     ims_array = np.array([im.data for im in images])
     print 'Calculating temperature values...',
-    temps, fits = calc_fits(ims_array, model, temp, n_temps, n_wlens, x, y, 1)
+    temps, fits = calc_fits(ims_array, model, temp, n_temps, n_wlens, x, y, n_params)
     print 'Done.'
     tempmap = temps[:, :, 0], images[2].meta.copy(), fits
     # TODO: figure out how to change things in the header and save them.
@@ -110,6 +120,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
     t0 = 5.6
     thiswlen = None
     client = vso.VSOClient()
+    print submap
 
     if datfile:
         images = {}
@@ -213,10 +224,7 @@ class TemperatureMap(GenericMap):
             fname.replace('/images/', '/data/')
 
         try:
-            #if not os.path.exists(fname):
-            #    sys("gunzip {}.gz".format(fname))
             newmap = Map(fname)
-            #sys("gzip {} -f".format(fname))
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             if n_params == 3:
