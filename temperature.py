@@ -104,9 +104,9 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
                     model[t, w, h, :] /= normmod
         model.flush()
     ims_array = np.array([im.data for im in images])
-    print 'Calculating temperature values...',
+    if verbose: print 'Calculating temperature values...',
     temps, fits = calc_fits(ims_array, model, temp, n_temps, n_wlens, x, y, n_params)
-    print 'Done.'
+    if verbose: print 'Done.'
     tempmap = temps[:, :, 0], images[2].meta.copy(), fits
     # TODO: figure out how to change things in the header and save them.
     
@@ -115,12 +115,12 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
 
 def create_tempmap(date, n_params=1, data_dir=None,
                    maps_dir=None, datfile=None, date_first=True,
-                   submap=None):
+                   submap=None, verbose=False):
     wlens = ['094', '131', '171', '193', '211', '335']
     t0 = 5.6
     thiswlen = None
     client = vso.VSOClient()
-    print submap
+    if verbose: print 'Cropping to coordinates {}'.format(submap)
 
     if datfile:
         images = {}
@@ -168,7 +168,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                 else:
                     pass
             if len(images) < wl+1:
-                print 'File not found. Downloading from VSO...'
+                if verbose: print 'File not found. Downloading from VSO...'
                 qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
                                   vso.attrs.Wave(wlen, wlen),
                                   vso.attrs.Instrument('aia'),
@@ -184,13 +184,13 @@ def create_tempmap(date, n_params=1, data_dir=None,
 
     # Normalise images to 171A
     normim = images[2].data.copy()
-    print 'Normalising images'
+    if verbose: print 'Normalising images'
     for i in range(len(wlens)):
         images[i].data /= normim
     
     # Produce temperature map
     if n_params == 1:
-        tempmap = find_temp(images, t0)
+        tempmap = find_temp(images, t0, n_params=n_params, verbose=verbose)
     else:
         pass
 
@@ -199,7 +199,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
 
 class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
-                 fname=None, infofile=None, submap=None):
+                 fname=None, infofile=None, submap=None, verbose=False):
         if (not fname and not date) or (fname and date):
             print """"You must specify either a date and time for which to create
                 temperatures or the name of a file containing a valid 
