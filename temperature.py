@@ -75,8 +75,8 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         widths = [0.1]
         heights = [1.0]
     else:
-        widths = np.arange(0.1, 1.1, 0.1)
-        heights = np.arange(20, 35, 2)
+        widths = np.arange(0.1, 1.1, 0.4)
+        heights = [20, 25, 30]#np.arange(20, 35, 2)
         # TODO: check if either of the above are sensible ranges of numbers
         # TODO: think about how having a height other than 1 impacts the decision to normalise everything
     n_temps, n_widths, n_heights = len(temp), len(widths), len(heights)
@@ -107,7 +107,10 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
     if verbose: print 'Calculating temperature values...',
     temps, fits = calc_fits(ims_array, model, temp, n_temps, n_wlens, x, y, n_params)
     if verbose: print 'Done.'
-    tempmap = temps[:, :, 0], images[2].meta.copy(), fits
+    if n_params == 1:
+        tempmap = temps[:, :, 0], images[2].meta.copy(), fits
+    else:
+        tempmap = temps, images[2].meta.copy(), fits
     # TODO: figure out how to change things in the header and save them.
     
     return tempmap
@@ -189,10 +192,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
         images[i].data /= normim
     
     # Produce temperature map
-    if n_params == 1:
-        tempmap = find_temp(images, t0, n_params=n_params, verbose=verbose)
-    else:
-        pass
+    tempmap = find_temp(images, t0, n_params=n_params, verbose=verbose)
 
     return tempmap
 
@@ -201,7 +201,7 @@ class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
                  fname=None, infofile=None, submap=None, verbose=False):
         if (not fname and not date) or (fname and date):
-            print """"You must specify either a date and time for which to create
+            print """You must specify either a date and time for which to create
                 temperatures or the name of a file containing a valid 
                 TemperatureMap object."""
             return
@@ -227,19 +227,16 @@ class TemperatureMap(GenericMap):
             newmap = Map(fname)
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
-            if n_params == 3:
-                pass
-            else:
-                data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap)
-                GenericMap.__init__(self, data, meta)
-                lowx, highx = (self.xrange[0] / self.scale['x'],
-                               self.xrange[1] / self.scale['x'])
-                lowy, highy = (self.yrange[0] / self.scale['y'],
-                               self.yrange[1] / self.scale['y'])
-                x_grid, y_grid = np.mgrid[lowx:highx-1, lowy:highy-1]
-                r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
-                outer_rad = (self.rsun_arcseconds * 1.5) / self.scale['x']
-                self.data[r_grid > outer_rad] = None
+            data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap, verbose=verbose)
+            GenericMap.__init__(self, data, meta)
+            lowx, highx = (self.xrange[0] / self.scale['x'],
+                           self.xrange[1] / self.scale['x'])
+            lowy, highy = (self.yrange[0] / self.scale['y'],
+                           self.yrange[1] / self.scale['y'])
+            x_grid, y_grid = np.mgrid[lowx:highx-1, lowy:highy-1]
+            r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
+            outer_rad = (self.rsun_arcseconds * 1.5) / self.scale['x']
+            self.data[r_grid > outer_rad] = None
 
         tmapcubehelix = _cm.cubehelix(s=2.8, r=0.7, h=2.0, gamma=1.0)
         cm.register_cmap(name='temphelix', data=tmapcubehelix)
@@ -249,7 +246,6 @@ class TemperatureMap(GenericMap):
         self.data_dir = data_dir
         self.maps_dir = maps_dir
         self.temperature_scale = 'log'
-        #self.cmap = cm.coolwarm
         self.region = None
         self.region_coordinate = {'x': 0.0, 'y': 0.0}
         if n_params == 3:
