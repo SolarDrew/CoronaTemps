@@ -86,14 +86,14 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         if force_temp_scan:
             raise IOError
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='r', shape=*shape)
+                          dtype='float32', mode='r', shape=shape)
     except IOError:
         if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
         resp = load_temp_responses()
         logt = np.arange(0, 15.05, 0.05)
         delta_t = logt[1] - logt[0]
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='w+', shape=*shape)
+                          dtype='float32', mode='w+', shape=shape)
         for t, meantemp in enumerate(temp):
             for w, width in widths:
                 for h, height in heights:
