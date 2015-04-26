@@ -118,7 +118,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
 def create_tempmap(date, n_params=1, data_dir=None,
                    maps_dir=None, datfile=None, date_first=True,
                    submap=None, verbose=False):
-    wlens = ['094', '131', '171', '193', '211', '335']
+    wlens = ['94', '131', '171', '193', '211', '335']
     t0 = 5.6
     thiswlen = None
     client = vso.VSOClient()
