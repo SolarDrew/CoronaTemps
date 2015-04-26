@@ -160,6 +160,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                 filelist = glob.glob(filename)
                 if filelist != []:
+                    if verbose: print 'File found: ', filelist[0]
                     imagefiles.append(filelist[0])
                     temp_im = aiaprep(Map(filelist[0]))
                     if submap:
@@ -170,19 +171,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                 else:
                     pass
             if len(images) < wl+1:
-                if verbose: print 'File not found. Downloading from VSO...'
-                qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
-                                  vso.attrs.Wave(wlen, wlen),
-                                  vso.attrs.Instrument('aia'),
-                                  vso.attrs.Provider('JSOC'))
-                res = client.get(qr, path=path.join(fits_dir, '{file}'), site='NSO').wait()
-                if isinstance(res, list): res = res[0]
-                imagefiles.append(res)
-                temp_im = aiaprep(Map(res))
-                if submap:
-                    temp_im = temp_im.submap(*submap)
-                temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
-                images.append(temp_im)
+                if verbose: print 'Insufficient raw data - only found {} of 6 files'.format(len(images))
 
     # Normalise images to 171A
     normim = images[2].data.copy()
