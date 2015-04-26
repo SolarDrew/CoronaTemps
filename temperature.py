@@ -17,8 +17,7 @@ from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
 from sys import argv
-from os import path
-from os import system
+from os import path, system, makedirs
 import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
 import glob
@@ -156,8 +155,8 @@ def create_tempmap(date, n_params=1, data_dir=None,
             ntimes = int(timerange.seconds())
             times = [time.start() for time in timerange.split(ntimes)]
             for time in times:
-                fits_dir = join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
-                filename = join(fits_dir,
+                fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
+                filename = path.join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                 filelist = glob.glob(filename)
                 if filelist != []:
@@ -176,7 +175,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                                   vso.attrs.Wave(wlen, wlen),
                                   vso.attrs.Instrument('aia'),
                                   vso.attrs.Provider('JSOC'))
-                res = client.get(qr, path=join(fits_dir, '{file}'), site='NSO').wait()
+                res = client.get(qr, path=path.join(fits_dir, '{file}'), site='NSO').wait()
                 if isinstance(res, list): res = res[0]
                 imagefiles.append(res)
                 temp_im = aiaprep(Map(res))
@@ -214,13 +213,12 @@ class TemperatureMap(GenericMap):
             if maps_dir is None:
                 maps_dir='/media/huw/temperature_maps/{}pars/'.format(n_params)
             
-            #maps_dir = join(maps_dir, '{:%Y/%m/%d}'.format(date))
-            fname = join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+            fname = path.join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
 
         if infofile:
             data_dir = None
             maps_dir = open(infofile).readline()[:-1]
-            fname = join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+            fname = path.join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
             fname.replace('/images/', '/data/')
 
         try:
@@ -349,13 +347,10 @@ class TemperatureMap(GenericMap):
             thismap.plot()#*extr_args, **extr_kwargs)
         
         if save_output:
-            error = os.system('touch '+os.path.join(maps_dir,'maps/{:%Y/%m/%d/} > shelloutput.txt'.format(date)))
-            if error != 0:
-                os.system('{0}{1:%Y}; {0}{1:%Y/%m}; {0}{1:%Y/%m/%d} > shelloutput.txt'\
-                        .format('mkdir '+os.path.join(maps_dir, 'maps/'), date))
-            filename = os.path.join(maps_dir,
-                'maps/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}_with{}'.format(date,
-                                                                   display_wlen))
+            savedir = path.join(maps_dir, 'maps/{:%Y/%m/%d}'.format(date))
+            if not path.exists(savedir):
+                makedirs(savedir)
+            filename = path.join(maps_dir, '{%Y-%m-%dT%H:%M:%S}_with{}'.format(date, display_wlen))
             plt.savefig(filename)
             if self.region != None:
                 reg_dir = maps_dir + 'maps/region_maps'
@@ -384,10 +379,10 @@ class TemperatureMap(GenericMap):
     
     def save(self):#, compress=False):
         date = sunpy.time.parse_time(self.date)
-        if not os.path.exists(self.maps_dir):
-            os.makedirs(self.maps_dir)
-        fname = os.path.join(self.maps_dir,
-                             '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+        if not path.exists(self.maps_dir):
+            makedirs(self.maps_dir)
+        fname = path.join(self.maps_dir,
+                          '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
         #if compress:
         #    sys("gzip {} -f".format(fname))
@@ -402,7 +397,7 @@ if __name__ == "__main__":
     tmap.save()
     
     image_dir = open(infofile).readline()[:-1]
-    fname = os.path.join(image_dir, '{:%Y-%m-%dT%H_%M_%S}'.format(date))
+    fname = path.join(image_dir, '{:%Y-%m-%dT%H_%M_%S}'.format(date))
     print "Temperature map image saved to: {}".format(fname)
     
     fig = plt.figure(16, 12)
