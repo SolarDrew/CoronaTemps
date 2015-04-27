@@ -114,10 +114,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
     temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
     if verbose: print 'Done.'
-    if n_params == 1:
-        tempmap = temps[:, :, 0], images[2].meta.copy(), fits
-    else:
-        tempmap = temps, images[2].meta.copy(), fits
+    tempmap = temps, images[2].meta.copy(), fits
     # TODO: figure out how to change things in the header and save them.
     
     return tempmap
@@ -223,7 +220,9 @@ class TemperatureMap(GenericMap):
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap, verbose=verbose)
-            GenericMap.__init__(self, data, meta)
+            GenericMap.__init__(self, data[..., 0], meta)
+            if data.shape[2] != 1:
+                self.meta['allpars'] = data
             lowx, highx = (self.xrange[0] / self.scale['x'],
                            self.xrange[1] / self.scale['x'])
             lowy, highy = (self.yrange[0] / self.scale['y'],
@@ -254,6 +253,13 @@ class TemperatureMap(GenericMap):
     def is_datasource_for(cls, data, header, **kwargs):
         return header.get('instrume', '').startswith('temperature')
     
+    @property
+    def gaussian_parameters(self):
+        if self.n_params == 1:
+            print "The full Gaussian DEM was not calculated for this TemperatureMap. Only peak temperatures are available."
+            return self.data
+        return self.meta['allpars']
+
     def region_map(self, region, mapsize=300, *args, **kwargs):
         """
         A function to take as input a hek record or similar and create a submap
