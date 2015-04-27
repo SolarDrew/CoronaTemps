@@ -5,8 +5,9 @@ from os import path
 from temperature import TemperatureMap as tmap
 
 
-data_dir = path.expanduser('~/CoronaTemps/')
+#data_dir = path.expanduser('~/CoronaTemps/')
 maps_dir = path.expanduser('~/CoronaTemps/')
+data_dir = '/imaps/sspfs/archive/sdo/aia/fulldisk/data/'
 thismap = tmap('2011-02-15', data_dir=data_dir, maps_dir=maps_dir, n_params=3, verbose=True)
 
 print thismap.shape
