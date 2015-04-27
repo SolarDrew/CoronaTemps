@@ -216,7 +216,7 @@ class TemperatureMap(GenericMap):
             fname.replace('/images/', '/data/')
 
         if n_params != 1:
-            fname.replace('.fits', '_full.fits')
+            fname = fname.replace('.fits', '_full.fits')
         if verbose: print fname
 
         try:
@@ -389,8 +389,8 @@ class TemperatureMap(GenericMap):
             makedirs(self.maps_dir)
         fname = path.join(self.maps_dir,
                           '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
-        if self.n_params == 3:
-            fname.replace('.fits', '_full.fits')
+        if self.n_params != 1:
+            fname = fname.replace('.fits', '_full.fits')
         GenericMap.save(self, fname, clobber=True)
 
 
