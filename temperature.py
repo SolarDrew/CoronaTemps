@@ -12,7 +12,6 @@ from matplotlib import cm, _cm
 from matplotlib import patches
 import numpy as np
 import sunpy
-from sunpy.net import vso
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from scipy.io.idl import readsav as read
@@ -121,7 +120,6 @@ def create_tempmap(date, n_params=1, data_dir=None,
     wlens = ['94', '131', '171', '193', '211', '335']
     t0 = 5.6
     thiswlen = None
-    client = vso.VSOClient()
     if verbose: print 'Cropping to coordinates {}'.format(submap)
 
     if datfile:
