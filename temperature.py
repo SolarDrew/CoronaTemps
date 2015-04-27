@@ -27,7 +27,7 @@ try:
 except ImportError:
     print 'Current extension is broken, missing or incompatible.\n'\
         +'Compiling Fortran extension.'
-    sys('f2py -c -m fits /imaps/holly/home/ajl7/CoronaTemps/fitsmodule.f90')
+    system('f2py -c -m fits /imaps/holly/home/ajl7/CoronaTemps/fitsmodule.f90')
     from fits import calc_fits
 
 
@@ -342,12 +342,11 @@ class TemperatureMap(GenericMap):
             filename = path.join(maps_dir, '{%Y-%m-%dT%H:%M:%S}_with{}'.format(date, display_wlen))
             plt.savefig(filename)
             if self.region != None:
-                reg_dir = maps_dir + 'maps/region_maps'
-                reg_dir = reg_dir + '/{}/'. format(self.region)
-                error = os.system('touch ' + reg_dir + ' > shelloutput.txt')
-                if error != 0:
-                    os.system('mkdir ' + reg_dir + ' > shelloutput.txt')
-                plt.savefig(reg_dir+'{:%Y-%m-%dT%H:%M:%S}'.format(date))
+                reg_dir = path.join(maps_dir,
+                                    'maps/region_maps/{}/'. format(self.region))
+                if not path.exists(reg_dir):
+                    makedirs(reg_dir)
+                plt.savefig(path.join(reg_dir, '{:%Y-%m-%dT%H:%M:%S}'.format(date)))
             plt.close()
         else:
             plt.show()
@@ -366,15 +365,14 @@ class TemperatureMap(GenericMap):
         
         return
     
-    def save(self):#, compress=False):
+    def save(self):
         date = sunpy.time.parse_time(self.date)
         if not path.exists(self.maps_dir):
             makedirs(self.maps_dir)
         fname = path.join(self.maps_dir,
                           '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         GenericMap.save(self, fname, clobber=True)
-        #if compress:
-        #    sys("gzip {} -f".format(fname))
+
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
