@@ -1,0 +1,7 @@
+#$ -S /bin/sh
+#$ -cwd
+#$ -q q_ab_mpc_long
+
+source ~/virtualenv-12.1.1/sunpy/bin/activate
+
+python test-full-gaussian.py
