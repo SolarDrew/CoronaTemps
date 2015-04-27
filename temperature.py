@@ -67,6 +67,7 @@ def load_temp_responses(n_wlens=6, corrections=True):
 def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, verbose=False):
     # Get dimensions of image
     x, y = images[0].shape
+    if verbose: print x, y, images.shape, images[0].shape
     n_wlens = len(images)
     temp = np.arange(t0, 7.01, 0.01)
     if n_params == 1:
