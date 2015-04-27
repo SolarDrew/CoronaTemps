@@ -20,6 +20,7 @@ from os import path, system, makedirs
 import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
 import glob
+from itertools import product
 try:
     from fits import calc_fits
     print 'Fortran extension imported successfully'
@@ -72,38 +73,41 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         # Assume a width of the gaussian DEM distribution and normalise the height
         widths = [0.1]
         heights = [1.0]
+        parvals = temp
     else:
         widths = np.arange(0.1, 1.1, 0.4)
         heights = [20, 25, 30]#np.arange(20, 35, 2)
         # TODO: check if either of the above are sensible ranges of numbers
         # TODO: think about how having a height other than 1 impacts the decision to normalise everything
-    n_temps, n_widths, n_heights = len(temp), len(widths), len(heights)
-    shape = n_temps, n_widths, n_heights, n_wlens
+        parvals = product((temp, widths, heights))
+    n_vals = len(temp) * len(widths) * len(heights)
     
     try:
         if force_temp_scan:
             raise IOError
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='r', shape=shape)
+                          dtype='float32', mode='r', shape=(n_vals, n_wlens))
     except IOError:
         if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
         resp = load_temp_responses()
         logt = np.arange(0, 15.05, 0.05)
         delta_t = logt[1] - logt[0]
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='w+', shape=shape)
-        for t, meantemp in enumerate(temp):
-            for w, width in enumerate(widths):
-                for h, height in enumerate(heights):
+                          dtype='float32', mode='w+', shape=(n_vals, n_wlens))
+        index = 0
+        for meantemp in temp:
+            for width in widths:
+                for height in heights:
                     dem = gaussian(logt, meantemp, width, height)
                     f = resp * dem
-                    model[t, w, h, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
-                    normmod = model[t, w, h, 2]
-                    model[t, w, h, :] /= normmod
+                    model[index, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
+                    normmod = model[index, 2]
+                    model[index, :] /= normmod
+                    index += 1
         model.flush()
     ims_array = np.array([im.data for im in images])
     if verbose: print 'Calculating temperature values...',
-    temps, fits = calc_fits(ims_array, model, temp, n_temps, n_wlens, x, y, n_params)
+    temps, fits = calc_fits(ims_array, model, temp, n_vals, n_wlens, x, y, n_params)
     if verbose: print 'Done.'
     if n_params == 1:
         tempmap = temps[:, :, 0], images[2].meta.copy(), fits
