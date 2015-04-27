@@ -80,6 +80,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         # TODO: check if either of the above are sensible ranges of numbers
         # TODO: think about how having a height other than 1 impacts the decision to normalise everything
         parvals = product((temp, widths, heights))
+        if verbose: print parvals
     n_vals = len(temp) * len(widths) * len(heights)
     
     try:
@@ -98,6 +99,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         for meantemp in temp:
             for width in widths:
                 for height in heights:
+                    if verbose: print index, meantemp, width, height, parvals[index]
                     dem = gaussian(logt, meantemp, width, height)
                     f = resp * dem
                     model[index, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
