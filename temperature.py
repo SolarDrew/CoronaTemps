@@ -108,7 +108,9 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
                     index += 1
         model.flush()
     ims_array = np.array([im.data for im in images])
-    if verbose: print 'Calculating temperature values...',
+    if verbose:
+        print 'Calculating temperature values...',
+        print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
     temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
     if verbose: print 'Done.'
     if n_params == 1:
