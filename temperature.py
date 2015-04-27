@@ -379,6 +379,8 @@ class TemperatureMap(GenericMap):
             makedirs(self.maps_dir)
         fname = path.join(self.maps_dir,
                           '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+        if self.n_params == 3:
+            fname.replace('.fits', '_full.fits')
         GenericMap.save(self, fname, clobber=True)
 
 
