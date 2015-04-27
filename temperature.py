@@ -79,7 +79,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         heights = [20, 25, 30]#np.arange(20, 35, 2)
         # TODO: check if either of the above are sensible ranges of numbers
         # TODO: think about how having a height other than 1 impacts the decision to normalise everything
-        parvals = np.array([x for x in product((temp, widths, heights))])
+        parvals = np.array([x for x in product(temp, widths, heights)])
         if verbose: print parvals
     n_vals = len(temp) * len(widths) * len(heights)
     
@@ -109,7 +109,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         model.flush()
     ims_array = np.array([im.data for im in images])
     if verbose: print 'Calculating temperature values...',
-    temps, fits = calc_fits(ims_array, model, temp, n_vals, n_wlens, x, y, n_params)
+    temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
     if verbose: print 'Done.'
     if n_params == 1:
         tempmap = temps[:, :, 0], images[2].meta.copy(), fits
