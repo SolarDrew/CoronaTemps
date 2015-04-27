@@ -208,15 +208,16 @@ class TemperatureMap(GenericMap):
                 maps_dir='/media/huw/temperature_maps/{}pars/'.format(n_params)
             
             fname = path.join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
-            if n_params == 3:
-                fname.replace('.fits', '_full.fits')
-            if verbose: print fname
 
         if infofile:
             data_dir = None
             maps_dir = open(infofile).readline()[:-1]
             fname = path.join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
             fname.replace('/images/', '/data/')
+
+        if n_params != 1:
+            fname.replace('.fits', '_full.fits')
+        if verbose: print fname
 
         try:
             newmap = Map(fname)
