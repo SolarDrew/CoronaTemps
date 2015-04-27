@@ -17,13 +17,13 @@ print thismap3.shape
 print np.nanmin(thismap3.data[..., 0]), np.nanmean(thismap3.data[..., 0]), np.nanmax(thismap3.data[..., 0])
 
 fig = plt.figure(figsize=(14, 14))
-thismap.plot()
+thismap1.plot()
 plt.colorbar()
 plt.savefig(path.expanduser('~/CoronaTemps/1paramtemps'))
 plt.close()
 
 fig = plt.figure(figsize=(14, 14))
-thismap.plot()
+thismap3.plot()
 plt.colorbar()
 plt.savefig(path.expanduser('~/CoronaTemps/fullgausstemps'))
 plt.close()
