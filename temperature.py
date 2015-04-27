@@ -67,7 +67,7 @@ def load_temp_responses(n_wlens=6, corrections=True):
 def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, verbose=False):
     # Get dimensions of image
     x, y = images[0].shape
-    if verbose: print x, y, images.shape, images[0].shape
+    if verbose: print 'Image size:', x, y
     n_wlens = len(images)
     temp = np.arange(t0, 7.01, 0.01)
     if n_params == 1:
@@ -80,7 +80,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         heights = [20, 25, 30]#np.arange(20, 35, 2)
         # TODO: check if either of the above are sensible ranges of numbers
         # TODO: think about how having a height other than 1 impacts the decision to normalise everything
-        parvals = np.array([x for x in product(temp, widths, heights)])
+        parvals = np.array([i for i in product(temp, widths, heights)])
         if verbose: print parvals
     n_vals = len(temp) * len(widths) * len(heights)
     
