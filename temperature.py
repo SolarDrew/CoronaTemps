@@ -210,6 +210,7 @@ class TemperatureMap(GenericMap):
             fname = path.join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
             if n_params == 3:
                 fname.replace('.fits', '_full.fits')
+            if verbose: print fname
 
         if infofile:
             data_dir = None
