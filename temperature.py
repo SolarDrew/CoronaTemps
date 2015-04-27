@@ -156,6 +156,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
                 fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(time, wlen))
                 filename = path.join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
+                if verbose: print 'Searching {} for AIA data'.format(fits_dir)
                 filelist = glob.glob(filename)
                 if filelist != []:
                     if verbose: print 'File found: ', filelist[0]
