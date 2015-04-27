@@ -93,8 +93,8 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
                           dtype='float32', mode='w+', shape=shape)
         for t, meantemp in enumerate(temp):
-            for w, width in widths:
-                for h, height in heights:
+            for w, width in enumerate(widths):
+                for h, height in enumerate(heights):
                     dem = gaussian(logt, meantemp, width, height)
                     f = resp * dem
                     model[t, w, h, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
