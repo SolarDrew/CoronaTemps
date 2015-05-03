@@ -226,7 +226,8 @@ class TemperatureMap(GenericMap):
             data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap, verbose=verbose)
             GenericMap.__init__(self, data[..., 0], meta)
             if data.shape[2] != 1:
-                self.meta['allpars'] = data
+                self.meta['demwid'] = data[..., 1]
+                self.meta['demht'] = data[..., 2]
             lowx, highx = (self.xrange[0] / self.scale['x'],
                            self.xrange[1] / self.scale['x'])
             lowy, highy = (self.yrange[0] / self.scale['y'],
