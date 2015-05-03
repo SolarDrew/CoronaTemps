@@ -224,10 +224,10 @@ class TemperatureMap(GenericMap):
             GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap, verbose=verbose)
-            GenericMap.__init__(self, data[..., 0], meta)
+            GenericMap.__init__(self, data, meta)
             if data.shape[2] != 1:
-                self.meta['demwid'] = data[..., 1]
-                self.meta['demht'] = data[..., 2]
+                self.dem_width = data[..., 1]
+                self.emission_measure = data[..., 2]
             lowx, highx = (self.xrange[0] / self.scale['x'],
                            self.xrange[1] / self.scale['x'])
             lowy, highy = (self.yrange[0] / self.scale['y'],
@@ -392,6 +392,8 @@ class TemperatureMap(GenericMap):
                           '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         if self.n_params != 1:
             fname = fname.replace('.fits', '_full.fits')
+            self.data = np.array([self.data, self.dem_width, self.emission_measure])
+            print self.data.shape
         GenericMap.save(self, fname, clobber=True)
 
 
