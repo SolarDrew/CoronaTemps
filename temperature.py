@@ -76,8 +76,8 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         heights = [1.0]
         parvals = temp
     else:
-        widths = np.arange(0.1, 1.1, 0.4)
-        heights = [20, 25, 30]#np.arange(20, 35, 2)
+        widths = np.arange(0.1, 0.8, 0.3)
+        heights = [19, 23, 27]#np.arange(20, 35, 2)
         # TODO: check if either of the above are sensible ranges of numbers
         # TODO: think about how having a height other than 1 impacts the decision to normalise everything
         parvals = np.array([i for i in product(temp, widths, heights)])
@@ -231,6 +231,7 @@ class TemperatureMap(GenericMap):
             data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap, verbose=verbose)
             GenericMap.__init__(self, data[..., 0], meta)
             if data.shape[2] != 1:
+                data[data == 0] = np.nan
                 self.dem_width = data[..., 1]
                 self.emission_measure = data[..., 2]
             lowx, highx = (self.xrange[0] / self.scale['x'],
