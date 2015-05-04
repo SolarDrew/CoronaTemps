@@ -221,7 +221,12 @@ class TemperatureMap(GenericMap):
 
         try:
             newmap = Map(fname)
-            GenericMap.__init__(self, newmap.data, newmap.meta)
+            if len(newmap.data.shape) > 2:
+                GenericMap.__init__(self, newmap.data[..., 0], newmap.meta)
+                self.dem_width = newmap.data[..., 1]
+                self.emission_measure = newmap.data[..., 2]
+            else:
+                GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
             data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap, verbose=verbose)
             GenericMap.__init__(self, data[..., 0], meta)
