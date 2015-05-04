@@ -258,13 +258,6 @@ class TemperatureMap(GenericMap):
     def is_datasource_for(cls, data, header, **kwargs):
         return header.get('instrume', '').startswith('temperature')
     
-    @property
-    def gaussian_parameters(self):
-        if self.n_params == 1:
-            print "The full Gaussian DEM was not calculated for this TemperatureMap. Only peak temperatures are available."
-            return self.data
-        return self.meta['allpars']
-
     def region_map(self, region, mapsize=300, *args, **kwargs):
         """
         A function to take as input a hek record or similar and create a submap
