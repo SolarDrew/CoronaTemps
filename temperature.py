@@ -67,7 +67,9 @@ def load_temp_responses(n_wlens=6, corrections=True):
 def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, verbose=False):
     # Get dimensions of image
     x, y = images[0].shape
-    if verbose: print 'Image size:', x, y
+    if verbose:
+        print 'Image size:', x, y
+        print 'Image maxes:', [im.max() for im in images]
     n_wlens = len(images)
     temp = np.arange(t0, 7.01, 0.01)
     if n_params == 1:
@@ -76,12 +78,11 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         heights = [1.0]
         parvals = temp
     else:
-        widths = np.arange(0.1, 0.8, 0.3)
-        heights = [19, 23, 27]#np.arange(20, 35, 2)
+        widths = [0.1, 0.3, 0.6]#np.arange(0.1, 0.8, 0.3)
+        heights = [1e25, 1e27, 1e29]#[19, 23, 27]#np.arange(20, 35, 2)
         # TODO: check if either of the above are sensible ranges of numbers
         # TODO: think about how having a height other than 1 impacts the decision to normalise everything
         parvals = np.array([i for i in product(temp, widths, heights)])
-        if verbose: print parvals
     n_vals = len(temp) * len(widths) * len(heights)
     
     try:
@@ -92,6 +93,7 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
     except IOError:
         if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
         resp = load_temp_responses()
+        if verbose: print resp.max(axis=1)
         logt = np.arange(0, 15.05, 0.05)
         delta_t = logt[1] - logt[0]
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
@@ -100,15 +102,15 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         for meantemp in temp:
             for width in widths:
                 for height in heights:
-                    if verbose: print index, meantemp, width, height, parvals[index]
                     dem = gaussian(logt, meantemp, width, height)
                     f = resp * dem
-                    model[index, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
+                    model[index, :] = np.sum(f, axis=1) * delta_t
                     if n_params == 1:
                         normmod = model[index, 2]
                         model[index, :] /= normmod
                     index += 1
         model.flush()
+        if verbose: print model.max(axis=0)
     ims_array = np.array([im.data for im in images])
     if verbose:
         print 'Calculating temperature values...',
@@ -187,7 +189,7 @@ def create_tempmap(date, n_params=1, data_dir=None,
             images[i].data /= normim
     
     # Produce temperature map
-    tempmap = find_temp(images, t0, n_params=n_params, verbose=verbose)
+    tempmap = find_temp(images, t0, n_params=n_params, verbose=verbose, force_temp_scan=True)
 
     return tempmap
 
