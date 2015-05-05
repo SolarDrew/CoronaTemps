@@ -104,8 +104,9 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
                     dem = gaussian(logt, meantemp, width, height)
                     f = resp * dem
                     model[index, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
-                    normmod = model[index, 2]
-                    model[index, :] /= normmod
+                    if n_params == 1:
+                        normmod = model[index, 2]
+                        model[index, :] /= normmod
                     index += 1
         model.flush()
     ims_array = np.array([im.data for im in images])
@@ -178,11 +179,12 @@ def create_tempmap(date, n_params=1, data_dir=None,
             if len(images) < wl+1:
                 if verbose: print 'Insufficient raw data - only found {} of 6 files'.format(len(images))
 
-    # Normalise images to 171A
-    normim = images[2].data.copy()
-    if verbose: print 'Normalising images'
-    for i in range(len(wlens)):
-        images[i].data /= normim
+    # Normalise images to 171A if only using one parameter
+    if n_params == 1:
+        normim = images[2].data.copy()
+        if verbose: print 'Normalising images'
+        for i in range(len(wlens)):
+            images[i].data /= normim
     
     # Produce temperature map
     tempmap = find_temp(images, t0, n_params=n_params, verbose=verbose)
