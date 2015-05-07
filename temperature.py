@@ -21,6 +21,7 @@ import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
 import glob
 from itertools import product
+from mpi4py import MPI
 try:
     from fits import calc_fits
     print 'Fortran extension imported successfully'
@@ -32,6 +33,8 @@ except ImportError:
 
 
 home = path.expanduser('~')
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 
 def gaussian(x, mean=0.0, std=1.0, amp=1.0):
@@ -98,17 +101,17 @@ def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, 
         delta_t = logt[1] - logt[0]
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
                           dtype='float32', mode='w+', shape=(n_vals, n_wlens))
-        index = 0
-        for meantemp in temp:
-            for width in widths:
-                for height in heights:
-                    dem = gaussian(logt, meantemp, width, height)
-                    f = resp * dem
-                    model[index, :] = np.sum(f, axis=1) * delta_t
-                    if n_params == 1:
-                        normmod = model[index, 2]
-                        model[index, :] /= normmod
-                    index += 1
+        for p, params in enumerate(parvals):
+            dem = gaussian(logt, *params)
+            f = resp * dem
+            model[p, :] = np.sum(f, axis=1) * delta_t
+        if n_params == 1:
+            normmod = model[:, 2]
+            model /= normmod
+        print resp.shape
+        print dem.shape
+        print f.shape
+        print model.shape
         model.flush()
         if verbose: print model.max(axis=0)
     ims_array = np.array([im.data for im in images])
