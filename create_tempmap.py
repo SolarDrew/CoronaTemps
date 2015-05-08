@@ -68,7 +68,7 @@ def load_temp_responses(n_wlens=6, corrections=True):
     return resp
 
 
-date, n_params, data_dir, maps_dir, datfile, submap, verbose, force_temp_scan = argv[1:]
+date, n_params, data_dir, datfile, submap, verbose, force_temp_scan = argv[1:]
 
 wlens = ['094', '131', '171', '193', '211', '335']
 t0 = 5.6
