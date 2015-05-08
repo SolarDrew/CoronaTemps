@@ -172,16 +172,12 @@ def create_tempmap(date, n_params=1, data_dir=None,
         if n_params == 1:
             normmod = model[:, 2]
             model /= normmod
-        print resp.shape
-        print dem.shape
-        print f.shape
-        print model.shape
         model.flush()
         if verbose: print model.max(axis=0)
     ims_array = np.array([im.data for im in images])
     if verbose:
         print 'Calculating temperature values...',
-        print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
+        if verbose: print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
     temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
     if verbose: print 'Done.'
     tempmap = temps, images[2].meta.copy(), fits
