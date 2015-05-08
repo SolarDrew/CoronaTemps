@@ -67,68 +67,9 @@ def load_temp_responses(n_wlens=6, corrections=True):
     return resp
 
 
-def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=None, n_params=1, verbose=False):
-    # Get dimensions of image
-    x, y = images[0].shape
-    if verbose:
-        print 'Image size:', x, y
-        print 'Image maxes:', [im.max() for im in images]
-    n_wlens = len(images)
-    temp = np.arange(t0, 7.01, 0.01)
-    if n_params == 1:
-        # Assume a width of the gaussian DEM distribution and normalise the height
-        widths = [0.1]
-        heights = [1.0]
-        parvals = temp
-    else:
-        widths = [0.1, 0.3, 0.6]#np.arange(0.1, 0.8, 0.3)
-        heights = [1e25, 1e27, 1e29]#[19, 23, 27]#np.arange(20, 35, 2)
-        # TODO: check if either of the above are sensible ranges of numbers
-        # TODO: think about how having a height other than 1 impacts the decision to normalise everything
-        parvals = np.array([i for i in product(temp, widths, heights)])
-    n_vals = len(temp) * len(widths) * len(heights)
-    
-    try:
-        if force_temp_scan:
-            raise IOError
-        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='r', shape=(n_vals, n_wlens))
-    except IOError:
-        if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
-        resp = load_temp_responses()
-        if verbose: print resp.max(axis=1)
-        logt = np.arange(0, 15.05, 0.05)
-        delta_t = logt[1] - logt[0]
-        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='w+', shape=(n_vals, n_wlens))
-        for p, params in enumerate(parvals):
-            dem = gaussian(logt, *params)
-            f = resp * dem
-            model[p, :] = np.sum(f, axis=1) * delta_t
-        if n_params == 1:
-            normmod = model[:, 2]
-            model /= normmod
-        print resp.shape
-        print dem.shape
-        print f.shape
-        print model.shape
-        model.flush()
-        if verbose: print model.max(axis=0)
-    ims_array = np.array([im.data for im in images])
-    if verbose:
-        print 'Calculating temperature values...',
-        print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
-    temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
-    if verbose: print 'Done.'
-    tempmap = temps, images[2].meta.copy(), fits
-    # TODO: figure out how to change things in the header and save them.
-    
-    return tempmap
-
-
 def create_tempmap(date, n_params=1, data_dir=None,
                    maps_dir=None, datfile=None, date_first=True,
-                   submap=None, verbose=False):
+                   submap=None, verbose=False, force_temp_scan=False):
     wlens = ['094', '131', '171', '193', '211', '335']
     t0 = 5.6
     thiswlen = None
@@ -191,9 +132,61 @@ def create_tempmap(date, n_params=1, data_dir=None,
         for i in range(len(wlens)):
             images[i].data /= normim
     
-    # Produce temperature map
-    tempmap = find_temp(images, t0, n_params=n_params, verbose=verbose, force_temp_scan=True)
-
+    # Get dimensions of image
+    x, y = images[0].shape
+    if verbose:
+        print 'Image size:', x, y
+        print 'Image maxes:', [im.max() for im in images]
+    n_wlens = len(images)
+    temp = np.arange(t0, 7.01, 0.01)
+    if n_params == 1:
+        # Assume a width of the gaussian DEM distribution and normalise the height
+        widths = [0.1]
+        heights = [1.0]
+        parvals = temp
+    else:
+        widths = [0.1, 0.3, 0.6]#np.arange(0.1, 0.8, 0.3)
+        heights = [1e25, 1e27, 1e29]#[19, 23, 27]#np.arange(20, 35, 2)
+        # TODO: check if either of the above are sensible ranges of numbers
+        # TODO: think about how having a height other than 1 impacts the decision to normalise everything
+        parvals = np.array([i for i in product(temp, widths, heights)])
+    n_vals = len(temp) * len(widths) * len(heights)
+    
+    try:
+        if force_temp_scan:
+            raise IOError
+        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+                          dtype='float32', mode='r', shape=(n_vals, n_wlens))
+    except IOError:
+        if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
+        resp = load_temp_responses()
+        if verbose: print resp.max(axis=1)
+        logt = np.arange(0, 15.05, 0.05)
+        delta_t = logt[1] - logt[0]
+        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+                          dtype='float32', mode='w+', shape=(n_vals, n_wlens))
+        for p, params in enumerate(parvals):
+            dem = gaussian(logt, *params)
+            f = resp * dem
+            model[p, :] = np.sum(f, axis=1) * delta_t
+        if n_params == 1:
+            normmod = model[:, 2]
+            model /= normmod
+        print resp.shape
+        print dem.shape
+        print f.shape
+        print model.shape
+        model.flush()
+        if verbose: print model.max(axis=0)
+    ims_array = np.array([im.data for im in images])
+    if verbose:
+        print 'Calculating temperature values...',
+        print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
+    temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
+    if verbose: print 'Done.'
+    tempmap = temps, images[2].meta.copy(), fits
+    # TODO: figure out how to change things in the header and save them.
+    
     return tempmap
 
 
@@ -235,7 +228,9 @@ class TemperatureMap(GenericMap):
             else:
                 GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
-            data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile, submap=submap, verbose=verbose)
+            data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile,
+                                             submap=submap, verbose=verbose,
+                                             force_temp_scan=True)
             GenericMap.__init__(self, data[..., 0], meta)
             if data.shape[2] != 1:
                 data[data == 0] = np.nan
