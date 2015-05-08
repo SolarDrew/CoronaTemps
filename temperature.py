@@ -17,15 +17,7 @@ from sys import argv
 from os import path, system, makedirs
 import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
-import subprocess as subp
-try:
-    from fits import calc_fits
-    print 'Fortran extension imported successfully'
-except ImportError:
-    print 'Current extension is broken, missing or incompatible.\n'\
-        +'Compiling Fortran extension.'
-    system(path.expanduser('f2py -c -m fits ~/CoronaTemps/fitsmodule.f90'))
-    from fits import calc_fits
+import subprocess32 as subp
 
 
 home = path.expanduser('~')
