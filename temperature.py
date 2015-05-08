@@ -13,15 +13,11 @@ from matplotlib import patches
 import numpy as np
 import sunpy
 from sunpy.map import Map, GenericMap
-from sunpy.instr.aia import aiaprep
-from scipy.io.idl import readsav as read
 from sys import argv
 from os import path, system, makedirs
 import datetime as dt
 from sunpy.time.timerange import TimeRange as tr
-import glob
-from itertools import product
-from mpi4py import MPI
+import subprocess as subp
 try:
     from fits import calc_fits
     print 'Fortran extension imported successfully'
@@ -37,7 +33,8 @@ home = path.expanduser('~')
 
 class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
-                 fname=None, infofile=None, submap=None, verbose=False):
+                 fname=None, infofile=None, submap=None, verbose=False,
+                 force_temp_scan=False):
         if (not fname and not date) or (fname and date):
             print """You must specify either a date and time for which to create
                 temperatures or the name of a file containing a valid 
@@ -73,9 +70,10 @@ class TemperatureMap(GenericMap):
             else:
                 GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
-            data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir, infofile,
-                                             submap=submap, verbose=verbose,
-                                             force_temp_scan=True)
+            status = subp.call("python create_tempmap.py {} {} {} {} {} {} {}".format(
+                date, n_params, data_dir, datfile, submap, verbose, force_temp_scan)
+            newmap = Map(path.expanduser('~/CoronaTemps/temporary.fits'))
+            data, meta = newmap.data, newmap.meta
             GenericMap.__init__(self, data[..., 0], meta)
             if data.shape[2] != 1:
                 data[data == 0] = np.nan
