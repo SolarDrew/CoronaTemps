@@ -180,5 +180,6 @@ if verbose:
     if verbose: print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
 temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
 if verbose: print 'Done.'
-tempmap = temps, images[2].meta.copy(), fits
-# TODO: figure out how to change things in the header and save them.
+
+tempmap = GenericMap(temps, images[2].meta.copy())
+tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
