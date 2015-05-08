@@ -67,8 +67,17 @@ def load_temp_responses(n_wlens=6, corrections=True):
     
     return resp
 
+args = []
+for a in argv[1:]:
+    for f in [eval, sunpy.time.parse_time]:
+        try:
+            a = f(a)
+            break
+        except:
+            continue
+    args.append(a)
 
-date, n_params, data_dir, datfile, submap, verbose, force_temp_scan = argv[1:]
+date, n_params, data_dir, datfile, submap, verbose, force_temp_scan = args
 
 wlens = ['094', '131', '171', '193', '211', '335']
 t0 = 5.6
