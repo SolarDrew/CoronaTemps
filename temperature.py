@@ -21,6 +21,7 @@ import subprocess32 as subp
 
 
 home = path.expanduser('~')
+cortemps = path.join(home, 'CoronaTemps')
 
 
 class TemperatureMap(GenericMap):
@@ -62,9 +63,10 @@ class TemperatureMap(GenericMap):
             else:
                 GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
-            status = subp.call("python create_tempmap.py {} {} {} {} {} {} {}".format(
-                date, n_params, data_dir, infofile, submap, verbose, force_temp_scan))
-            newmap = Map(path.expanduser('~/CoronaTemps/temporary.fits'))
+            status = subp.call("python {} {} {} {} {} {} {} {}".format(
+                path.join(cortemps, 'create_tempmap.py'), date, n_params, data_dir,
+                infofile, submap, verbose, force_temp_scan))
+            newmap = Map(path.join(cortemps, 'temporary.fits'))
             data, meta = newmap.data, newmap.meta
             GenericMap.__init__(self, data[..., 0], meta)
             if data.shape[2] != 1:
