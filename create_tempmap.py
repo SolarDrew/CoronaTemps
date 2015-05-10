@@ -173,10 +173,9 @@ if n_params == 1:
     heights = [1.0]
     parvals = temp
 else:
-    widths = [0.1, 0.3, 0.6]#np.arange(0.1, 0.8, 0.3)
-    heights = [1e25, 1e27, 1e29]#[19, 23, 27]#np.arange(20, 35, 2)
+    widths = np.arange(0.1, 0.8, 0.2)
+    heights = [10.0**x for x in np.arange(20, 35, 2)]
     # TODO: check if either of the above are sensible ranges of numbers
-    # TODO: think about how having a height other than 1 impacts the decision to normalise everything
     parvals = np.array([i for i in product(temp, widths, heights)])
 n_vals = len(temp) * len(widths) * len(heights)
     
