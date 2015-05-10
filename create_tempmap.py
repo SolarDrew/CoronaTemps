@@ -5,6 +5,7 @@ Created on Thu Jun  5 15:15:09 2014
 @author: drew
 """
 
+from __future__ import division
 from matplotlib import use
 use('agg')
 import matplotlib.pyplot as plt
@@ -82,71 +83,89 @@ date, n_params, data_dir, datfile, submap, verbose, force_temp_scan = args
 wlens = ['094', '131', '171', '193', '211', '335']
 t0 = 5.6
 thiswlen = None
-if verbose: print 'Cropping to coordinates {}'.format(submap)
 
-if datfile:
-    images = {}
-    f = open(datfile)
-    # Loop through wavelengths
-    for line in f:
-        if line[:3] in wlens:
-            allwlenmaps = []
-            thiswlen = line[:3]
-            print 'Loading {} files'.format(thiswlen)
-        elif 'fits' in line:
-            thismap = aiaprep(Map(line[:-1]))
-            thismap.data /= thismap.exposure_time
-            allwlenmaps.append(thismap)
-        elif line.strip() in ['', '\n']:
-            if thiswlen:
-                wlenmap = allwlenmaps[-1]
-                for thismap in allwlenmaps[:-1]:
-                    wlenmap.data += thismap.data
-                wlenmap.data /= len(allwlenmaps)
-                images[thiswlen] = wlenmap
+if rank == 0:
+    if datfile:
+        images = {}
+        f = open(datfile)
+        # Loop through wavelengths
+        for line in f:
+            if line[:3] in wlens:
+                allwlenmaps = []
+                thiswlen = line[:3]
+                print 'Loading {} files'.format(thiswlen)
+            elif 'fits' in line:
+                thismap = aiaprep(Map(line[:-1]))
+                thismap.data /= thismap.exposure_time
+                allwlenmaps.append(thismap)
+            elif line.strip() in ['', '\n']:
+                if thiswlen:
+                    wlenmap = allwlenmaps[-1]
+                    for thismap in allwlenmaps[:-1]:
+                        wlenmap.data += thismap.data
+                    wlenmap.data /= len(allwlenmaps)
+                    images[thiswlen] = wlenmap
  
-    images = [images[w] for w in wlens]
-else:
-    images = []
-    imagefiles = []
-    for wl, wlen in enumerate(wlens):
-        fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
-        if verbose: print 'Searching {} for AIA data'.format(fits_dir)
-        timerange = tr(date - dt.timedelta(seconds=5),
-                       date + dt.timedelta(seconds=11))
-        ntimes = int(timerange.seconds())
-        times = [time.start() for time in timerange.split(ntimes)]
-        for time in times:
-            filename = path.join(fits_dir,
-                'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
-            filelist = glob.glob(filename)
-            if filelist != []:
-                if verbose: print 'File found: ', filelist[0]
-                imagefiles.append(filelist[0])
-                temp_im = aiaprep(Map(filelist[0]))
-                if submap:
-                    temp_im = temp_im.submap(*submap)
-                temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
-                images.append(temp_im)
-                break
-            else:
-                pass
-        if len(images) < wl+1:
-            if verbose: print 'Insufficient raw data - only found {} of 6 files'.format(len(images))
+        images = [images[w] for w in wlens]
+    else:
+        images = []
+        imagefiles = []
+        for wl, wlen in enumerate(wlens):
+            fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
+            if verbose: print 'Searching {} for AIA data'.format(fits_dir)
+            timerange = tr(date - dt.timedelta(seconds=5),
+                           date + dt.timedelta(seconds=11))
+            ntimes = int(timerange.seconds())
+            times = [time.start() for time in timerange.split(ntimes)]
+            for time in times:
+                filename = path.join(fits_dir,
+                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
+                filelist = glob.glob(filename)
+                if filelist != []:
+                    if verbose: print 'File found: ', filelist[0]
+                    imagefiles.append(filelist[0])
+                    temp_im = aiaprep(Map(filelist[0]))
+                    if submap:
+                        temp_im = temp_im.submap(*submap)
+                    temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+                    images.append(temp_im)
+                    break
+                else:
+                    pass
+            if len(images) < wl+1:
+                if verbose: print 'Insufficient raw data - only found {} of 6 files'.format(len(images))
 
-# Normalise images to 171A if only using one parameter
-if n_params == 1:
-    normim = images[2].data.copy()
-    if verbose: print 'Normalising images'
-    for i in range(len(wlens)):
-        images[i].data /= normim
-    
+    # Normalise images to 171A if only using one parameter
+    if n_params == 1:
+        normim = images[2].data.copy()
+        if verbose: print 'Normalising images'
+        for i in range(len(wlens)):
+            images[i].data /= normim
+    header = images[2].meta.copy()
+    images = np.array([im.data for im in images])
+
+# Scatter image data to each process
+if rank == 0:
+    #[images[..., (p/size)*images.shape[2]:((p+1)/size)*images.shape[2]] \
+    #    for p in range(size)]
+    temp = []
+    for p in range(size):
+        mini = (p/size)*images.shape[2]
+        maxi = ((p+1)/size)*images.shape[2]
+        temp.append(images[..., mini:maxi])
+        if verbose: print p, mini, maxi, images[..., mini:maxi].shape
+    images = temp
+    if verbose: print len(images), images[0].shape
+else:
+    images = None
+images = comm.scatter(images, root=0)
+
 # Get dimensions of image
 x, y = images[0].shape
 if verbose:
-    print 'Image size:', x, y
-    print 'Image maxes:', [im.max() for im in images]
-n_wlens = len(images)
+    print 'Image size, rank {}:'.format(rank), x, y
+    print 'Image maxes, rank {}:'.format(rank), [im.max() for im in images]
+n_wlens = images.shape[0]
 temp = np.arange(t0, 7.01, 0.01)
 if n_params == 1:
     # Assume a width of the gaussian DEM distribution and normalise the height
@@ -181,14 +200,26 @@ except IOError:
     if n_params == 1:
         normmod = model[:, 2]
         model /= normmod
-    model.flush()
-    if verbose: print model.max(axis=0)
-ims_array = np.array([im.data for im in images])
+    if rank == 0:
+        model.flush()
+        if verbose: print model.max(axis=0)
 if verbose:
-    print 'Calculating temperature values...',
-    if verbose: print ims_array.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
-temps, fits = calc_fits(ims_array, model, parvals, n_vals, n_wlens, x, y, n_params)
+    if rank == 0: print 'Calculating temperature values...',
+    print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
+temps, fits = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
 if verbose: print 'Done.'
 
-tempmap = GenericMap(temps, images[2].meta.copy())
-tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
+# Get data all back in one place and save it
+temps = comm.gather(temps, root=0)
+if rank == 0:
+    if verbose: print len(temps), temps[0].shape
+    temp = np.zeros(shape=(x, y*size, n_params))
+    for p in range(size):
+        mini = (p/size)*temp.shape[1]
+        maxi = ((p+1)/size)*temp.shape[1]
+        temp[:, mini:maxi, :] = temps[p]
+        if verbose: print p, mini, maxi, images[:, mini:maxi, :].shape
+    temps = temp
+    if verbose: print temps.shape
+    tempmap = GenericMap(temps, header)
+    tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
