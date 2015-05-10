@@ -178,30 +178,35 @@ else:
     # TODO: check if either of the above are sensible ranges of numbers
     parvals = np.array([i for i in product(temp, widths, heights)])
 n_vals = len(temp) * len(widths) * len(heights)
-    
-try:
-    if force_temp_scan:
-        raise IOError
-    model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                      dtype='float32', mode='r', shape=(n_vals, n_wlens))
-except IOError:
-    if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
-    resp = load_temp_responses()
-    if verbose: print resp.max(axis=1)
-    logt = np.arange(0, 15.05, 0.05)
-    delta_t = logt[1] - logt[0]
-    model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
-                      dtype='float32', mode='w+', shape=(n_vals, n_wlens))
-    for p, params in enumerate(parvals):
-        dem = gaussian(logt, *params)
-        f = resp * dem
-        model[p, :] = np.sum(f, axis=1) * delta_t
-    if n_params == 1:
-        normmod = model[:, 2]
-        model /= normmod
-    if rank == 0:
+
+if rank == 0:
+    try:
+        if force_temp_scan:
+            raise IOError
+        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+                          dtype='float32', mode='r', shape=(n_vals, n_wlens))
+    except IOError:
+        if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
+        resp = load_temp_responses()
+        if verbose: print resp.max(axis=1)
+        logt = np.arange(0, 15.05, 0.05)
+        delta_t = logt[1] - logt[0]
+        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+                          dtype='float32', mode='w+', shape=(n_vals, n_wlens))
+        for p, params in enumerate(parvals):
+            dem = gaussian(logt, *params)
+            f = resp * dem
+            model[p, :] = np.sum(f, axis=1) * delta_t
+        if n_params == 1:
+            normmod = model[:, 2]
+            model /= normmod
         model.flush()
         if verbose: print model.max(axis=0)
+else:
+    model = None
+
+model = comm.bcast(model, root=0)
+
 if verbose:
     if rank == 0: print 'Calculating temperature values...',
     print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
