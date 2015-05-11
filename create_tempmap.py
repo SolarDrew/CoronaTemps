@@ -173,7 +173,7 @@ if n_params == 1:
     heights = [1.0]
     parvals = temp
 else:
-    widths = np.arange(0.1, 0.8, 0.2)
+    widths = np.arange(0.1, 0.8, 0.1)
     heights = [10.0**h for h in np.arange(20, 35, 2)]
     # TODO: check if either of the above are sensible ranges of numbers
     parvals = np.array([i for i in product(temp, widths, heights)])
