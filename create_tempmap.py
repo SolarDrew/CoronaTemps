@@ -174,10 +174,11 @@ if n_params == 1:
     parvals = temp
 else:
     widths = np.arange(0.1, 0.8, 0.1)
-    heights = [10.0**h for h in np.arange(20, 35, 2)]
+    heights = [10.0**h for h in np.arange(20, 35, 1)]
     # TODO: check if either of the above are sensible ranges of numbers
     parvals = np.array([i for i in product(temp, widths, heights)])
 n_vals = len(temp) * len(widths) * len(heights)
+if verbose: print len(temp), len(widths), len(heights), n_vals, n_vals*6
 
 if rank == 0:
     try:
@@ -211,6 +212,8 @@ if verbose:
     if rank == 0: print 'Calculating temperature values...',
     print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
 temps, fits = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+# Convert EM values to log scale
+temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
 
 # Get data all back in one place and save it
@@ -222,7 +225,7 @@ if rank == 0:
         mini = (p/size)*temp.shape[1]
         maxi = ((p+1)/size)*temp.shape[1]
         temp[:, mini:maxi, :] = temps[p]
-        if verbose: print p, mini, maxi, images[:, mini:maxi, :].shape
+        if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
     temps = temp
     if verbose: print temps.shape
     tempmap = GenericMap(temps, header)
