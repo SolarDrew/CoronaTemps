@@ -12,7 +12,8 @@ maps_dir = path.expanduser('~/CoronaTemps/')
 data_dir = '/imaps/sspfs/archive/sdo/aia/fulldisk/data/'
 thismap1 = tmap('2011-02-15', data_dir=data_dir, maps_dir=maps_dir, verbose=True)
 thismap1.save()
-thismap3 = tmap('2011-02-15', data_dir=data_dir, maps_dir=maps_dir, n_params=3, verbose=True)
+thismap3 = tmap('2011-02-15', data_dir=data_dir, maps_dir=maps_dir, n_params=3,
+                verbose=True, force_temp_scan=True)
 #thismap3.save()
 widths = map.Map(thismap3.dem_width, thismap3.meta)
 EMs = map.Map(thismap3.emission_measure, thismap3.meta)
