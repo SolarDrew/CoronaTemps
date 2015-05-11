@@ -12,6 +12,7 @@ maps_dir = path.expanduser('~/CoronaTemps/')
 data_dir = '/imaps/sspfs/archive/sdo/aia/fulldisk/data/'
 thismap1 = tmap('2011-02-15', data_dir=data_dir, maps_dir=maps_dir, verbose=True)
 thismap1.save()
+#thismap3 = tmap('2011-03-11 23:55', data_dir=data_dir, maps_dir=maps_dir, n_params=3,
 thismap3 = tmap('2011-02-15', data_dir=data_dir, maps_dir=maps_dir, n_params=3,
                 verbose=True, force_temp_scan=True)
 #thismap3.save()
@@ -30,7 +31,13 @@ plt.colorbar()
 plt.savefig(path.expanduser('~/CoronaTemps/1paramtemps'))
 plt.close()
 
-fig, ax = plt.subplots(1, 3, figsize=(42, 14))
+fig = plt.figure(figsize=(14, 14))
+thismap3.plot(vmin=5.7, vmax=7.0, cmap='CMRmap')
+plt.colorbar()
+plt.savefig(path.expanduser('~/CoronaTemps/fullgausstemps_2011-02-15'))
+plt.close()
+
+"""fig, ax = plt.subplots(1, 3, figsize=(42, 14))
 plt.sca(ax[0])
 thismap3.plot()
 plt.colorbar()
@@ -41,4 +48,4 @@ plt.sca(ax[2])
 EMs.plot()#vmin=19, vmax=27)
 plt.colorbar()
 plt.savefig(path.expanduser('~/CoronaTemps/fullgausstemps'))
-plt.close()
+plt.close()"""
