@@ -15,7 +15,14 @@ import matplotlib.pyplot as plt
 import sunpy
 from sunpy.map import Map
 from temperature import TemperatureMap
-from create_tempmap import gaussian, load_temp_responses
+from utils import gaussian, load_temp_responses
+from os import path, makedirs
+import subprocess32 as subp
+
+# Define CoronaTemps home folder and output folder
+CThome = path.join(path.expanduser('~'), 'CoronaTemps')
+outdir = path.join(CThome, 'validation')
+if not path.exists(outdir): makedirs(outdir)
 
 # Define parameter ranges
 temps = np.arange(4.6, 7.405, 0.005)
@@ -53,25 +60,37 @@ mapmeta = voidmap.meta
 for w, wid in enumerate(heights):#widths):
     print 'Width:', wid
     fig = plt.figure(figsize=(30, 12))
-    for wl in range(6):
-        emiss = emission[wl, :, w, :]
+    for wl, wlength  in enumerate(['94', '131', '171', '193', '211', '335']):
+        emiss = Map(emission[wl, :, w, :], mapmeta)
+        emiss.cmap = sunpy.cm.get_cmap('sdoaia{}'.format(wlength))
+        emiss.meta['naxis1'] = emiss.shape[1]
+        emiss.meta['naxis2'] = emiss.shape[0]
+        emiss.meta['cdelt1'] = widths[1] - widths[0]
+        emiss.meta['cdelt2'] = temps[1] - temps[0]
+        emiss.meta['crval1'] = widths[0]
+        emiss.meta['crval2'] = temps[0]
+        emiss.meta['crpix1'] = 0.5
+        emiss.meta['crpix2'] = 0.5
+        fits_dir = path.join(CThome, 'data', 'synthetic', wlength)
+        if not path.exists(fits_dir): makedirs(fits_dir)
+        emiss.save(path.join(fits_dir, 'model.fits'))
         fig.add_subplot(1, 6, wl+1)
-        plt.imshow(emiss, cmap='coolwarm', origin='lower', aspect='auto',
-                   extent=[widths[0], widths[-1], temps[0], temps[-1]],
-                   interpolation='none', vmin=0.0, vmax=1.0)
+        emiss.plot()#vmin=0.0, vmax=1.0)
+        plt.title('{}/171'.format(wlength))
         plt.xlabel('Input width')
-        if wl == 0:
-            plt.ylabel('Input log(T)')
+        plt.ylabel('Input log(T)')
         plt.colorbar()
-    testdir = '/media/huw/temperature_maps/tests/'
-    plt.savefig('plots2/model_emission_hei={:.2f}'.format(wid))
+    plt.savefig(path.join(outdir, 'model_emission_h={}'.format(wid)))
     plt.close()
     
     images = [Map(emission[i, :, w, :], mapmeta) for i in range(6)]
-    data, meta, fits = find_temp(images)
-    cmdargs = "mpiexec -n 8 python {} model {} {} {} {} {} {}".format(
-        path.join(cortemps, 'create_tempmap.py'), n_params, data_dir, infofile,
-        submap, verbose, force_temp_scan).split()
+    cmdargs = "mpiexec -n 1 python {} model {} {} {} {} {} {}".format(
+        path.join(CThome, 'create_tempmap.py'), 1, CThome, None,
+        None, True, False).split()
+    status = subp.call(cmdargs)
+    newmap = Map(path.join(CThome, 'temporary.fits'))
+    subp.call(["rm", path.join(CThome, 'temporary.fits')])
+    data, meta = newmap.data, newmap.meta
 
     truetemp = np.array(list(temps)*n_widths).reshape((n_widths, n_temps)).T
     diff = (abs(truetemp - data) / truetemp) * 100
