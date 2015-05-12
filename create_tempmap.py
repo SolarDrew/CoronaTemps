@@ -82,7 +82,10 @@ if rank == 0:
         images = []
         imagefiles = []
         for wl, wlen in enumerate(wlens):
-            fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
+            if date == 'model':
+                fits_dir = path.join(data_dir, 'synthetic', wlen)
+            else:
+                fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
             if verbose: print 'Searching {} for AIA data'.format(fits_dir)
             timerange = tr(date - dt.timedelta(seconds=5),
                            date + dt.timedelta(seconds=11))

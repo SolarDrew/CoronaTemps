@@ -85,8 +85,8 @@ for w, wid in enumerate(heights):#widths):
     
     images = [Map(emission[i, :, w, :], mapmeta) for i in range(6)]
     cmdargs = "mpiexec -n 1 python {} model {} {} {} {} {} {}".format(
-        path.join(CThome, 'create_tempmap.py'), 1, CThome, None,
-        None, True, False).split()
+        path.join(CThome, 'create_tempmap.py'), 1, path.join(CThome, 'data'),
+        None, None, True, False).split()
     status = subp.call(cmdargs)
     newmap = Map(path.join(CThome, 'temporary.fits'))
     subp.call(["rm", path.join(CThome, 'temporary.fits')])
