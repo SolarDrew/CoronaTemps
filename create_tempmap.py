@@ -84,6 +84,8 @@ if rank == 0:
         for wl, wlen in enumerate(wlens):
             if date == 'model':
                 fits_dir = path.join(data_dir, 'synthetic', wlen)
+                images.append(Map(path.join(fits_dir, 'model.fits')))
+                continue
             else:
                 fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
             if verbose: print 'Searching {} for AIA data'.format(fits_dir)
@@ -148,7 +150,7 @@ if n_params == 1:
     parvals = temp
 else:
     widths = np.arange(0.1, 0.8, 0.1)
-    heights = [10.0**h for h in np.arange(20, 35, 1)]
+    heights = 10.0 ** np.arange(20, 35, 0.5)
     # TODO: check if either of the above are sensible ranges of numbers
     parvals = np.array([i for i in product(temp, widths, heights)])
 n_vals = len(temp) * len(widths) * len(heights)
@@ -186,8 +188,8 @@ if verbose:
     if rank == 0: print 'Calculating temperature values...',
     print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
 temps, fits = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
-# Convert EM values to log scale
-temps[..., 2] = np.log10(temps[..., 2])
+# Convert EM values to log scale if there are any
+if temps.shape[2] > 1: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
 
 # Get data all back in one place and save it
