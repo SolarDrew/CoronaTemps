@@ -1,12 +1,11 @@
-SUBROUTINE calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_pars, results, fitvals)
+SUBROUTINE calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_pars, results)
 
 IMPLICIT NONE
 INTEGER, INTENT(IN) :: n_vals, n_wlens, x, y, n_pars
 REAL, DIMENSION(n_vals, n_pars), INTENT(IN) :: parvals
 REAL, DIMENSION(n_vals, n_wlens), INTENT(IN) :: model
 REAL, DIMENSION(n_wlens, x, y), INTENT(IN) :: images
-REAL, DIMENSION(x, y), INTENT(OUT) :: fitvals
-REAL, DIMENSION(x, y, n_pars), INTENT(OUT) :: results
+REAL, DIMENSION(x, y, n_pars+1), INTENT(OUT) :: results
 INTEGER :: i, j, t, w
 REAL :: error, total_error, this_fit, best_fit
 
@@ -22,8 +21,8 @@ DO j = 1, y
       this_fit = total_error / REAL(n_wlens)
       IF (this_fit < best_fit) THEN
         best_fit = this_fit
-        fitvals(i, j) = this_fit
-        results(i, j, :) = parvals(t, :)
+        results(i, j, 1:n_pars) = parvals(t, :)
+        results(i, j, n_pars+1) = this_fit
       END IF
     END DO
   END DO

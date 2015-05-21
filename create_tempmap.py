@@ -187,7 +187,7 @@ model = comm.bcast(model, root=0)
 if verbose:
     if rank == 0: print 'Calculating temperature values...',
     print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
-temps, fits = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
 # Convert EM values to log scale if there are any
 if temps.shape[2] > 1: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
@@ -196,7 +196,7 @@ if verbose: print 'Done.'
 temps = comm.gather(temps, root=0)
 if rank == 0:
     if verbose: print len(temps), temps[0].shape
-    temp = np.zeros(shape=(x, y*size, n_params))
+    temp = np.zeros(shape=(x, y*size, n_params+1))
     for p in range(size):
         mini = (p/size)*temp.shape[1]
         maxi = ((p+1)/size)*temp.shape[1]

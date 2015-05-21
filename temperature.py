@@ -73,10 +73,11 @@ class TemperatureMap(GenericMap):
             subp.call(["rm", path.join(cortemps, 'temporary.fits')])
             data, meta = newmap.data, newmap.meta
             GenericMap.__init__(self, data[..., 0], meta)
-            if data.shape[2] != 1:
+            if data.shape[2] != 2:
                 data[data == 0] = np.nan
                 self.dem_width = data[..., 1]
                 self.emission_measure = data[..., 2]
+            self.goodness_of_fit = data[..., -1]
             lowx, highx = (self.xrange[0] / self.scale['x'],
                            self.xrange[1] / self.scale['x'])
             lowy, highy = (self.yrange[0] / self.scale['y'],
