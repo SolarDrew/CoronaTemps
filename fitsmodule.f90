@@ -11,7 +11,7 @@ REAL :: error, total_error, this_fit, best_fit
 
 DO j = 1, y
   DO i = 1, x
-    best_fit = 1000000.0
+    best_fit = 0
     DO t = 1, n_vals
       total_error = 0.0
       DO w = 1, n_wlens
@@ -19,7 +19,7 @@ DO j = 1, y
         total_error = total_error + error
       END DO
       this_fit = total_error / REAL(n_wlens)
-      IF (this_fit < best_fit) THEN
+      IF (this_fit < best_fit .OR. t == 1) THEN
         best_fit = this_fit
         results(i, j, 1:n_pars) = parvals(t, :)
         results(i, j, n_pars+1) = this_fit
