@@ -15,6 +15,7 @@ import numpy as np
 import sunpy
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
+from sunpy.net import vso
 from scipy.io.idl import readsav as read
 from sys import argv
 from os import path, system, makedirs
@@ -109,7 +110,15 @@ if rank == 0:
                 else:
                     pass
             if len(images) < wl+1:
-                if verbose: print 'Insufficient raw data - only found {} of 6 files'.format(len(images))
+                if verbose: print 'Insufficient raw data - only found {} of 6 files. Downloading...'.format(len(images))
+                client = vso.VSOClient()
+                qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
+                                  vso.attrs.Wave(wlen, wlen),
+                                  vso.attrs.Instrument('aia'),
+                                  vso.attrs.Provider('JSOC'))
+                dwpath = path.join(fits_dir.replace('*/*', '{:%m/%d}'.format(date)),
+                                   '{file}')
+                res = client.get(qr, path=dwpath, site='NSO').wait()
 
     # Normalise images to 171A if only using one parameter
     if n_params == 1:
@@ -147,12 +156,11 @@ if n_params == 1:
     # Assume a width of the gaussian DEM distribution and normalise the height
     widths = [0.1]
     heights = [1.0]
-    parvals = temp
 else:
     widths = np.arange(0.1, 0.8, 0.1)
     heights = 10.0 ** np.arange(20, 35, 0.1)
     # TODO: check if either of the above are sensible ranges of numbers
-    parvals = np.array([i for i in product(temp, widths, heights)])
+parvals = np.array([i for i in product(temp, widths, heights)])
 n_vals = len(temp) * len(widths) * len(heights)
 if verbose: print len(temp), len(widths), len(heights), n_vals, n_vals*6
 
@@ -175,7 +183,7 @@ if rank == 0:
             f = resp * dem
             model[p, :] = np.sum(f, axis=1) * delta_t
         if n_params == 1:
-            normmod = model[:, 2]
+            normmod = model[:, 2].reshape((n_vals, 1))
             model /= normmod
         model.flush()
         if verbose: print model.max(axis=0)
@@ -185,11 +193,13 @@ else:
 model = comm.bcast(model, root=0)
 
 if verbose:
-    if rank == 0: print 'Calculating temperature values...',
+    if rank == 0: print 'Calculating temperature values...'
     print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
+if n_params == 1:
+    parvals = parvals[:, 0]
 temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
 # Convert EM values to log scale if there are any
-if temps.shape[2] > 1: temps[..., 2] = np.log10(temps[..., 2])
+if temps.shape[2] > 2: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
 
 # Get data all back in one place and save it
@@ -203,6 +213,6 @@ if rank == 0:
         temp[:, mini:maxi, :] = temps[p]
         if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
     temps = temp
-    if verbose: print temps.shape
+    if verbose: print 'End ct', temps.shape
     tempmap = GenericMap(temps, header)
     tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
