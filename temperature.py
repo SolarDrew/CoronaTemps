@@ -63,21 +63,26 @@ class TemperatureMap(GenericMap):
             else:
                 GenericMap.__init__(self, newmap.data, newmap.meta)
         except ValueError:
-            cmdargs = ["mpiexec", "-n", 8,
+            cmdargs = ["mpiexec", "-n", 16,
                 "python", path.join(cortemps, 'create_tempmap.py'),
                 date, n_params, data_dir, infofile, submap, verbose, force_temp_scan]
             cmdargs = [str(cmd) for cmd in cmdargs]
-            for c in cmdargs: print c
             status = subp.call(cmdargs)
             newmap = Map(path.join(cortemps, 'temporary.fits'))
             subp.call(["rm", path.join(cortemps, 'temporary.fits')])
             data, meta = newmap.data, newmap.meta
+            if verbose: print data.shape
             GenericMap.__init__(self, data[..., 0], meta)
             if data.shape[2] != 2:
                 data[data == 0] = np.nan
                 self.dem_width = data[..., 1]
                 self.emission_measure = data[..., 2]
             self.goodness_of_fit = data[..., -1]
+            if verbose:
+                print self.shape
+                print self.dem_width.shape
+                print self.emission_measure.shape
+                print self.goodness_of_fit.shape
             lowx, highx = (self.xrange[0] / self.scale['x'],
                            self.xrange[1] / self.scale['x'])
             lowy, highy = (self.yrange[0] / self.scale['y'],
