@@ -62,6 +62,7 @@ class TemperatureMap(GenericMap):
                 self.emission_measure = newmap.data[..., 2]
             else:
                 GenericMap.__init__(self, newmap.data, newmap.meta)
+            self.goodness_of_fit = newmap.data[..., -1]
         except ValueError:
             cmdargs = ["mpiexec", "-n", 16,
                 "python", path.join(cortemps, 'create_tempmap.py'),
@@ -238,11 +239,15 @@ class TemperatureMap(GenericMap):
             makedirs(self.maps_dir)
         fname = path.join(self.maps_dir,
                           '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+        alldata = np.zeros((self.shape[0], self.shape[1], self.n_params+1))
+        alldata[..., 0] = self.data
         if self.n_params != 1:
             fname = fname.replace('.fits', '_full.fits')
-            self.data = np.array([self.data, self.dem_width, self.emission_measure])
-            print self.data.shape
-        GenericMap.save(self, fname, clobber=True)
+            alldata[..., 1] = self.dem_width
+            alldata[..., 2] = self.emission_measure
+        alldata[..., -1] = self.goodness_of_fit
+        outmap = Map(alldata, self.meta.copy())
+        outmap.save(fname, clobber=True)
 
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
