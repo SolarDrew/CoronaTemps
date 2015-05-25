@@ -13,11 +13,12 @@ from matplotlib import patches
 import numpy as np
 import sunpy
 from sunpy.map import Map, GenericMap
+from sunpy.instr.aia import aiaprep
 from sys import argv
-from os import path, system, makedirs
-import datetime as dt
-from sunpy.time.timerange import TimeRange as tr
+from os import path, makedirs
 import subprocess32 as subp
+from scipy.io.idl import readsav as read
+import glob
 
 
 home = path.expanduser('~')
@@ -276,7 +277,6 @@ class TemperatureMap(GenericMap):
             and '211' are most likely to provide reliable results. Use of other
             channels is not recommended.
         """
-        # TODO: Make this a method of the TemperatureMap class
         # Load the appropriate temperature response function
         tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
         resp = tresp['resp{}'.format(wlen)]
@@ -286,8 +286,9 @@ class TemperatureMap(GenericMap):
         tempdata[np.isnan(tempdata)] = 0.0
         date = sunpy.time.parse_time(self.date)
         data_dir = self.data_dir
-        fits_dir = join(data_dir, '{}'.format(wlen))
-        filename = join(fits_dir, 'AIA{0:%Y%m%d}?{0:%H%M}*fits'.format(date))
+        fits_dir = path.join(data_dir, '{}'.format(wlen))
+        filename = path.join(fits_dir,
+                             'AIA{0:%Y%m%d}?{0:%H%M}*fits'.format(date))
     
         # Load and appropriately process AIA data
         filelist = glob.glob(filename)
