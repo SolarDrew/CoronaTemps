@@ -22,7 +22,7 @@ import subprocess32 as subp
 from itertools import product
 
 # Decide whether to assess single-parameter or full-Gaussian method
-n_pars = 3
+n_pars = 1
 
 # Define CoronaTemps home folder and output folder
 CThome = path.join(path.expanduser('~'), 'CoronaTemps')
@@ -34,7 +34,7 @@ if not path.exists(outdir): makedirs(outdir)
 temps = np.arange(4.6, 7.405, 0.005)
 #temps = np.arange(5.6, 7.005, 0.005)
 widths = np.array([0.01, 0.1, 0.5])#np.arange(0.01, 0.605, 0.005) # Just copying Aschwanden's range here
-heights = 10 ** np.arange(18, 37, 0.05)
+heights = 10 ** np.arange(18, 37, 1.0)#0.05)
 #heights = 10 ** np.arange(20, 35, 0.05)
 print heights
 n_temps = len(temps)
@@ -59,7 +59,7 @@ for p, params in enumerate(parvals):
     h = np.where(heights == params[2])[0][0]
     emission[:, t, w, h] = np.sum(f, axis=1) * delta_t
 
-#emission = emission / emission[2, :, :, :]
+emission = emission / emission[2, :, :, :]
 
 # Load AIA response functions
 resp = load_temp_responses()
@@ -108,15 +108,21 @@ for w, wid in enumerate(widths):#heights):
     
     #images = [Map(emission[i, :, :, w], mapmeta) for i in range(6)]
     images = [Map(emission[i, :, w, :], mapmeta) for i in range(6)]
-    cmdargs = "mpiexec -n 10 python {} model {} {} {} {} {} {}".format(
-        tmap_script, n_pars, path.join(CThome, 'data'),
-        None, None, True, True).split()
+    if n_pars == 3:
+        cmdargs = "mpiexec -n 10 python {} model {} {} {} {} {} {}".format(
+            tmap_script, n_pars, path.join(CThome, 'data'),
+            None, None, True, True).split()
+    else:
+        cmdargs = "python {} model {} {} {} {} {} {}".format(
+            tmap_script, n_pars, path.join(CThome, 'data'),
+            None, None, True, True).split()
     status = subp.call(cmdargs)
     newmap = Map(path.join(CThome, 'temporary.fits'))
     subp.call(["rm", path.join(CThome, 'temporary.fits')])
     data, meta = newmap.data[..., 0], newmap.meta
-    wdata = newmap.data[..., 1]
-    emdata = newmap.data[..., 2]
+    if n_pars == 3:
+        wdata = newmap.data[..., 1]
+        emdata = newmap.data[..., 2]
     print np.max(newmap.data[..., -1]), np.max(np.log10(newmap.data[..., -1]))
     fitsmap = Map(np.log10(newmap.data[..., -1]), newmap.meta.copy())
     print fitsmap.max()
@@ -126,14 +132,15 @@ for w, wid in enumerate(widths):#heights):
 
     #truetemp = np.array(list(temps)*n_widths).reshape((n_widths, n_temps)).T
     truetemp = np.array(list(temps)*n_heights).reshape((n_heights, n_temps)).T
-    truew = np.ones(shape=(n_temps, n_heights)) * wid
-    #print 'truew', truew.min(), truew.mean(), truew.max()
-    trueem = np.log10(np.array(list(heights)*n_temps).reshape(n_temps, n_heights))
     diff = Map((abs(truetemp - data) / truetemp) * 100, newmap.meta.copy())
-    diffw = Map((abs(truew - wdata) / truew) * 100, newmap.meta.copy())
-    #print 'wdata', wdata.min(), wdata.mean(), wdata.max()
-    #print 'diffw', diffw.min(), diffw.mean(), diffw.max()
-    diffem = Map((abs(trueem - emdata) / trueem) * 100, newmap.meta.copy())
+    if n_pars == 3:
+        truew = np.ones(shape=(n_temps, n_heights)) * wid
+        #print 'truew', truew.min(), truew.mean(), truew.max()
+        trueem = np.log10(np.array(list(heights)*n_temps).reshape(n_temps, n_heights))
+        diffw = Map((abs(truew - wdata) / truew) * 100, newmap.meta.copy())
+        #print 'wdata', wdata.min(), wdata.mean(), wdata.max()
+        #print 'diffw', diffw.min(), diffw.mean(), diffw.max()
+        diffem = Map((abs(trueem - emdata) / trueem) * 100, newmap.meta.copy())
     
     print wid, newmap.xrange, newmap.yrange, newmap.scale
     print wid, diff.xrange, diff.yrange, diff.scale
@@ -179,96 +186,97 @@ for w, wid in enumerate(widths):#heights):
     plt.savefig(path.join(outdir, 'tempsolutions_wid={:.3f}'.format(wid).replace('.', '_')))
     plt.close()
 
-    wdata = Map(wdata, newmap.meta.copy())
-    print wid, wdata.xrange, wdata.yrange, wdata.scale
-    print wid, diffw.xrange, diffw.yrange, diffw.scale
-    fig = plt.figure(figsize=(24, 12))
-    ax = fig.add_subplot(1, 3, 1)
-    wdata.plot(cmap='coolwarm', vmin=widths[0], vmax=widths[-1], aspect='auto')
-    #fig.gca().add_artist(rect)
-    plt.axvline(20.0, color='white')
-    plt.axvline(35.0, color='white')
-    plt.axhline(5.6, color='white')
-    plt.axhline(7.0, color='white')
-    plt.colorbar()
-    plt.title('Solution width', fontsize=28)
-    plt.ylabel('Input log(T)', fontsize=24)
-    plt.xlabel('Input EM', fontsize=24)#width', fontsize=24)
+    if n_pars == 3:
+        wdata = Map(wdata, newmap.meta.copy())
+        print wid, wdata.xrange, wdata.yrange, wdata.scale
+        print wid, diffw.xrange, diffw.yrange, diffw.scale
+        fig = plt.figure(figsize=(24, 12))
+        ax = fig.add_subplot(1, 3, 1)
+        wdata.plot(cmap='coolwarm', vmin=widths[0], vmax=widths[-1], aspect='auto')
+        #fig.gca().add_artist(rect)
+        plt.axvline(20.0, color='white')
+        plt.axvline(35.0, color='white')
+        plt.axhline(5.6, color='white')
+        plt.axhline(7.0, color='white')
+        plt.colorbar()
+        plt.title('Solution width', fontsize=28)
+        plt.ylabel('Input log(T)', fontsize=24)
+        plt.xlabel('Input EM', fontsize=24)#width', fontsize=24)
     
-    ax = fig.add_subplot(1, 3, 2)
-    print 'diffw', diffw.min(), diffw.max()
-    print np.nanmin(diffw.data), np.nanmax(diffw.data)
-    diffw.plot(cmap='RdYlGn_r', vmin=diffw.min(), vmax=diffw.max(), aspect='auto')
-    #fig.gca().add_artist(rect)
-    plt.axvline(20.0, color='white')
-    plt.axvline(35.0, color='white')
-    plt.axhline(5.6, color='white')
-    plt.axhline(7.0, color='white')
-    plt.colorbar()
-    plt.title('Difference from input (%)', fontsize=28)
-    plt.xlabel('Input EM', fontsize=24)
+        ax = fig.add_subplot(1, 3, 2)
+        print 'diffw', diffw.min(), diffw.max()
+        print np.nanmin(diffw.data), np.nanmax(diffw.data)
+        diffw.plot(cmap='RdYlGn_r', vmin=diffw.min(), vmax=diffw.max(), aspect='auto')
+        #fig.gca().add_artist(rect)
+        plt.axvline(20.0, color='white')
+        plt.axvline(35.0, color='white')
+        plt.axhline(5.6, color='white')
+        plt.axhline(7.0, color='white')
+        plt.colorbar()
+        plt.title('Difference from input (%)', fontsize=28)
+        plt.xlabel('Input EM', fontsize=24)
 
-    ax = fig.add_subplot(1, 3, 3)
-    fitsmap.plot(cmap='cubehelix', aspect='auto')
-    #fig.gca().add_artist(rect)
-    plt.axvline(20.0, color='white')
-    plt.axvline(35.0, color='white')
-    plt.axhline(5.6, color='white')
-    plt.axhline(7.0, color='white')
-    plt.colorbar()
-    plt.title('log(Goodness-of-fit)', fontsize=28)
-    plt.xlabel('Input EM', fontsize=24)
+        ax = fig.add_subplot(1, 3, 3)
+        fitsmap.plot(cmap='cubehelix', aspect='auto')
+        #fig.gca().add_artist(rect)
+        plt.axvline(20.0, color='white')
+        plt.axvline(35.0, color='white')
+        plt.axhline(5.6, color='white')
+        plt.axhline(7.0, color='white')
+        plt.colorbar()
+        plt.title('log(Goodness-of-fit)', fontsize=28)
+        plt.xlabel('Input EM', fontsize=24)
     
-    plt.savefig(path.join(outdir, 'widsolutions_wid={:.3f}'.format(wid).replace('.', '_')))
-    plt.close()
+        plt.savefig(path.join(outdir, 'widsolutions_wid={:.3f}'.format(wid).replace('.', '_')))
+        plt.close()
 
-    emdata = Map(emdata, newmap.meta.copy())
-    print wid, emdata.xrange, emdata.yrange, emdata.scale
-    print wid, diffem.xrange, diffem.yrange, diffem.scale
-    print wid, fitsmap.xrange, fitsmap.yrange, fitsmap.scale
-    fig = plt.figure(figsize=(24, 12))
-    ax = fig.add_subplot(1, 3, 1)
-    print 'emdata', emdata.max(), emdata.min()
-    print np.nanmin(emdata.data), np.nanmax(emdata.data)
-    emdata.plot(cmap='coolwarm', aspect='auto',
-                vmin=np.log10(heights[0]), vmax=np.log10(heights[-1]))
-    #fig.gca().add_artist(rect)
-    plt.axvline(20.0, color='white')
-    plt.axvline(35.0, color='white')
-    plt.axhline(5.6, color='white')
-    plt.axhline(7.0, color='white')
-    plt.colorbar()
-    plt.title('Solution EM', fontsize=28)
-    plt.ylabel('Input log(T)', fontsize=24)
-    plt.xlabel('Input EM', fontsize=24)#width', fontsize=24)
+        emdata = Map(emdata, newmap.meta.copy())
+        print wid, emdata.xrange, emdata.yrange, emdata.scale
+        print wid, diffem.xrange, diffem.yrange, diffem.scale
+        print wid, fitsmap.xrange, fitsmap.yrange, fitsmap.scale
+        fig = plt.figure(figsize=(24, 12))
+        ax = fig.add_subplot(1, 3, 1)
+        print 'emdata', emdata.max(), emdata.min()
+        print np.nanmin(emdata.data), np.nanmax(emdata.data)
+        emdata.plot(cmap='coolwarm', aspect='auto',
+                    vmin=np.log10(heights[0]), vmax=np.log10(heights[-1]))
+        #fig.gca().add_artist(rect)
+        plt.axvline(20.0, color='white')
+        plt.axvline(35.0, color='white')
+        plt.axhline(5.6, color='white')
+        plt.axhline(7.0, color='white')
+        plt.colorbar()
+        plt.title('Solution EM', fontsize=28)
+        plt.ylabel('Input log(T)', fontsize=24)
+        plt.xlabel('Input EM', fontsize=24)#width', fontsize=24)
     
-    ax = fig.add_subplot(1, 3, 2)
-    print 'diffem', diffem.min(), diffem.max()
-    print np.nanmin(diffem.data), np.nanmax(diffem.data)
-    diffem.plot(cmap='RdYlGn_r', aspect='auto',
-                vmin=diffem.min(), vmax=diffem.max())
-    #fig.gca().add_artist(rect)
-    plt.axvline(20.0, color='white')
-    plt.axvline(35.0, color='white')
-    plt.axhline(5.6, color='white')
-    plt.axhline(7.0, color='white')
-    plt.colorbar()
-    plt.title('Difference from input (%)', fontsize=28)
-    plt.xlabel('Input EM', fontsize=24)
+        ax = fig.add_subplot(1, 3, 2)
+        print 'diffem', diffem.min(), diffem.max()
+        print np.nanmin(diffem.data), np.nanmax(diffem.data)
+        diffem.plot(cmap='RdYlGn_r', aspect='auto',
+                    vmin=diffem.min(), vmax=diffem.max())
+        #fig.gca().add_artist(rect)
+        plt.axvline(20.0, color='white')
+        plt.axvline(35.0, color='white')
+        plt.axhline(5.6, color='white')
+        plt.axhline(7.0, color='white')
+        plt.colorbar()
+        plt.title('Difference from input (%)', fontsize=28)
+        plt.xlabel('Input EM', fontsize=24)
     
-    ax = fig.add_subplot(1, 3, 3)
-    fitsmap.plot(cmap='cubehelix', aspect='auto')
-    #fig.gca().add_artist(rect)
-    plt.axvline(20.0, color='white')
-    plt.axvline(35.0, color='white')
-    plt.axhline(5.6, color='white')
-    plt.axhline(7.0, color='white')
-    plt.colorbar()
-    plt.title('log(Goodness-of-fit)', fontsize=28)
-    plt.xlabel('Input EM', fontsize=24)
+        ax = fig.add_subplot(1, 3, 3)
+        fitsmap.plot(cmap='cubehelix', aspect='auto')
+        #fig.gca().add_artist(rect)
+        plt.axvline(20.0, color='white')
+        plt.axvline(35.0, color='white')
+        plt.axhline(5.6, color='white')
+        plt.axhline(7.0, color='white')
+        plt.colorbar()
+        plt.title('log(Goodness-of-fit)', fontsize=28)
+        plt.xlabel('Input EM', fontsize=24)
 
-    plt.savefig(path.join(outdir, 'emsolutions_wid={:.3f}'.format(wid).replace('.', '_')))
-    plt.close()
+        plt.savefig(path.join(outdir, 'emsolutions_wid={:.3f}'.format(wid).replace('.', '_')))
+        plt.close()
 
 """w = np.where((widths > 0.097)*(widths < 0.103))
 dataslice = data[:, w].reshape(len(temps))
