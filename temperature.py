@@ -250,12 +250,75 @@ class TemperatureMap(GenericMap):
         outmap.save(fname, clobber=True)
 
 
+    def min(self):
+        return np.nanmin(self.data)
+
+    def mean(self):
+        return np.nanmean(self.data, dtype='float64')
+
+    def max(self):
+        return np.nanmax(self.data)
+
+    def std(self):
+        return np.nanstd(self.data, dtype='float64')
+
+    def calculate_density(self, wlen='171', dz=100):
+        """
+        Calculate an approximation of the coronal average LOS density using a given
+        TemperatureMap object and a particular AIA channel.
+    
+        Parameters
+        ----------
+        tmap : CoronaTemps.temperature.TemperatureMap
+            A TemperatureMap instance containing coronal temperature data
+        wlen : {'94' | '131' | '171' | '193' | '211' | '335'}
+            AIA wavelength used to approximate the emission measure. '171', '193'
+            and '211' are most likely to provide reliable results. Use of other
+            channels is not recommended.
+        """
+        # TODO: Make this a method of the TemperatureMap class
+        # Load the appropriate temperature response function
+        tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
+        resp = tresp['resp{}'.format(wlen)]
+    
+        # Get some information from the TemperatureMap and set up filenames, etc
+        tempdata = self.data.copy()
+        tempdata[np.isnan(tempdata)] = 0.0
+        date = sunpy.time.parse_time(self.date)
+        data_dir = self.data_dir
+        fits_dir = join(data_dir, '{}'.format(wlen))
+        filename = join(fits_dir, 'AIA{0:%Y%m%d}?{0:%H%M}*fits'.format(date))
+    
+        # Load and appropriately process AIA data
+        filelist = glob.glob(filename)
+        if filelist == []:
+            print 'AIA data not found :('
+            return
+        aiamap = Map(filename)
+        aiamap.data /= aiamap.exposure_time
+        aiamap = aiaprep(aiamap)
+        aiamap = aiamap.submap(self.xrange, self.yrange)
+    
+        # Create new Map and put density values in it
+        nmap = Map(self.data.copy(), self.meta.copy())
+        indices = np.round((tempdata - 4.0) / 0.05).astype(int)
+        indices[indices < 0] = 0
+        indices[indices > 100] = 100
+        #nmap.data = np.sqrt(aiamap.data / resp[indices]) / dz
+        nmap.data = np.log10(aiamap.data / resp[indices])
+
+        nmapcubehelix = _cm.cubehelix(s=3.0, r=-0.5, h=1.6, gamma=1.0)
+        cm.register_cmap(name='denshelix', data=nmapcubehelix)
+        nmap.cmap = cm.get_cmap('denshelix')
+    
+        return nmap
+
+
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
 
 if __name__ == "__main__":
     date = sunpy.time.parse_time(argv[1])
-    infofile = argv[2]
-    
+    infofile = argv[2]    
     tmap = TemperatureMap(date, infofile=infofile)
     tmap.save()
     
