@@ -262,9 +262,9 @@ class TemperatureMap(GenericMap):
     def std(self):
         return np.nanstd(self.data, dtype='float64')
 
-    def calculate_density(self, wlen='171', dz=100):
+    def calculate_em(self, wlen='171', dz=100):
         """
-        Calculate an approximation of the coronal average LOS density using a given
+        Calculate an approximation of the coronal EmissionMeasure using a given
         TemperatureMap object and a particular AIA channel.
     
         Parameters
@@ -299,19 +299,18 @@ class TemperatureMap(GenericMap):
         aiamap = aiaprep(aiamap)
         aiamap = aiamap.submap(self.xrange, self.yrange)
     
-        # Create new Map and put density values in it
-        nmap = Map(self.data.copy(), self.meta.copy())
+        # Create new Map and put EM values in it
+        emmap = Map(self.data.copy(), self.meta.copy())
         indices = np.round((tempdata - 4.0) / 0.05).astype(int)
         indices[indices < 0] = 0
         indices[indices > 100] = 100
-        #nmap.data = np.sqrt(aiamap.data / resp[indices]) / dz
-        nmap.data = np.log10(aiamap.data / resp[indices])
+        emmap.data = np.log10(aiamap.data / resp[indices])
 
-        nmapcubehelix = _cm.cubehelix(s=3.0, r=-0.5, h=1.6, gamma=1.0)
-        cm.register_cmap(name='denshelix', data=nmapcubehelix)
-        nmap.cmap = cm.get_cmap('denshelix')
+        emmapcubehelix = _cm.cubehelix(s=3.0, r=-0.5, h=1.6, gamma=1.0)
+        cm.register_cmap(name='denshelix', data=emmapcubehelix)
+        emmap.cmap = cm.get_cmap('denshelix')
     
-        return nmap
+        return emmap
 
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
