@@ -53,21 +53,24 @@ class TemperatureMap(GenericMap):
 
         if n_params != 1:
             fname = fname.replace('.fits', '_full.fits')
-        if verbose: print fname
+
+        if fname and not date:
+            data_dir = path.dirname(fname)
+
+        if verbose: print fname, data_dir
 
         try:
             newmap = Map(fname)
-            if len(newmap.data.shape) > 2:
-                GenericMap.__init__(self, newmap.data[..., 0], newmap.meta)
+            GenericMap.__init__(self, newmap.data[..., 0], newmap.meta)
+            self.goodness_of_fit = newmap.data[..., -1]
+            if newmap.data.shape[2] != 2:
                 self.dem_width = newmap.data[..., 1]
                 self.emission_measure = newmap.data[..., 2]
-            else:
-                GenericMap.__init__(self, newmap.data, newmap.meta)
-            self.goodness_of_fit = newmap.data[..., -1]
         except ValueError:
-            cmdargs = ["mpiexec", "-n", 16,
-                "python", path.join(cortemps, 'create_tempmap.py'),
+            cmdargs = ["python", path.join(cortemps, 'create_tempmap.py'),
                 date, n_params, data_dir, infofile, submap, verbose, force_temp_scan]
+            if n_params != 1:
+                cmdargs = ["mpiexec", "-n", 16] + cmdargs
             cmdargs = [str(cmd) for cmd in cmdargs]
             status = subp.call(cmdargs)
             newmap = Map(path.join(cortemps, 'temporary.fits'))
@@ -82,9 +85,10 @@ class TemperatureMap(GenericMap):
             self.goodness_of_fit = data[..., -1]
             if verbose:
                 print self.shape
-                print self.dem_width.shape
-                print self.emission_measure.shape
                 print self.goodness_of_fit.shape
+                if n_params != 1:
+                    print self.dem_width.shape
+                    print self.emission_measure.shape
             lowx, highx = (self.xrange[0] / self.scale['x'],
                            self.xrange[1] / self.scale['x'])
             lowy, highy = (self.yrange[0] / self.scale['y'],
@@ -93,12 +97,12 @@ class TemperatureMap(GenericMap):
             r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
             outer_rad = (self.rsun_arcseconds * 1.5) / self.scale['x']
             self.data[r_grid > outer_rad] = None
+            self.meta['date-obs'] = str(date)
 
         tmapcubehelix = _cm.cubehelix(s=2.8, r=0.7, h=2.0, gamma=1.0)
         cm.register_cmap(name='temphelix', data=tmapcubehelix)
         self.cmap = cm.get_cmap('temphelix')
 
-        self.meta['date-obs'] = str(date)
         self.data_dir = data_dir
         self.maps_dir = maps_dir
         self.temperature_scale = 'log'
@@ -263,7 +267,7 @@ class TemperatureMap(GenericMap):
     def std(self):
         return np.nanstd(self.data, dtype='float64')
 
-    def calculate_em(self, wlen='171', dz=100):
+    def calculate_em(self, wlen='171', dz=100, model=False):
         """
         Calculate an approximation of the coronal EmissionMeasure using a given
         TemperatureMap object and a particular AIA channel.
@@ -285,31 +289,39 @@ class TemperatureMap(GenericMap):
         tempdata = self.data.copy()
         tempdata[np.isnan(tempdata)] = 0.0
         date = sunpy.time.parse_time(self.date)
-        data_dir = self.data_dir
-        fits_dir = path.join(data_dir, '{}'.format(wlen))
-        filename = path.join(fits_dir,
-                             'AIA{0:%Y%m%d}?{0:%H%M}*fits'.format(date))
+        if not model:
+            data_dir = self.data_dir
+            fits_dir = path.join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
+            filename = path.join(fits_dir,
+                                 '*{0:%Y?%m?%d}?{0:%H?%M}*fits'.format(date))
+            if wlen == '94': filename = filename.replace('94', '094')
     
-        # Load and appropriately process AIA data
-        filelist = glob.glob(filename)
-        if filelist == []:
-            print 'AIA data not found :('
-            return
-        aiamap = Map(filename)
-        aiamap.data /= aiamap.exposure_time
-        aiamap = aiaprep(aiamap)
-        aiamap = aiamap.submap(self.xrange, self.yrange)
-    
+            # Load and appropriately process AIA data
+            filelist = glob.glob(filename)
+            if filelist == []:
+                print 'AIA data not found :('
+                return
+            aiamap = Map(filename)
+            aiamap.data /= aiamap.exposure_time
+            aiamap = aiaprep(aiamap)
+            aiamap = aiamap.submap(self.xrange, self.yrange)
+        else:
+            fname = '/imaps/holly/home/ajl7/CoronaTemps/data/synthetic/{}/model.fits'.format(wlen)
+            if wlen == '94': fname = fname.replace('94', '094')
+            aiamap = Map(fname)
+
         # Create new Map and put EM values in it
         emmap = Map(self.data.copy(), self.meta.copy())
         indices = np.round((tempdata - 4.0) / 0.05).astype(int)
         indices[indices < 0] = 0
         indices[indices > 100] = 100
+        #print emmap.shape, indices.shape, tempdata.shape, aiamap.shape, resp.shape
         emmap.data = np.log10(aiamap.data / resp[indices])
+        #emmap.data = aiamap.data / resp[indices]
 
-        emmapcubehelix = _cm.cubehelix(s=3.0, r=-0.5, h=1.6, gamma=1.0)
-        cm.register_cmap(name='denshelix', data=emmapcubehelix)
-        emmap.cmap = cm.get_cmap('denshelix')
+        emmapcubehelix = _cm.cubehelix(s=2.8, r=-0.7, h=1.4, gamma=1.0)
+        cm.register_cmap(name='emhelix', data=emmapcubehelix)
+        emmap.cmap = cm.get_cmap('emhelix')
     
         return emmap
 
