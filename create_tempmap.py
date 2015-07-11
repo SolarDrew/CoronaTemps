@@ -25,6 +25,7 @@ import glob
 from itertools import product
 from mpi4py import MPI
 from utils import gaussian, load_temp_responses
+from astropy.units import Unit
 try:
     from fits import calc_fits
     print 'Fortran extension imported successfully'
@@ -81,7 +82,7 @@ if rank == 0:
         images = [images[w] for w in wlens]
     else:
         images = []
-        imagefiles = []
+        #imagefiles = []
         for wl, wlen in enumerate(wlens):
             if date == 'model':
                 fits_dir = path.join(data_dir, 'synthetic', wlen)
@@ -96,11 +97,14 @@ if rank == 0:
             times = [time.start() for time in timerange.split(ntimes)]
             for time in times:
                 filename = path.join(fits_dir,
-                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
+                    #'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
+                    'AIA{0:%Y%m%d_%H%M_*.fits}'.format(time))
+                if verbose: print filename
                 filelist = glob.glob(filename)
+                if verbose: print filelist
                 if filelist != []:
                     if verbose: print 'File found: ', filelist[0]
-                    imagefiles.append(filelist[0])
+                    #imagefiles.append(filelist[0])
                     temp_im = aiaprep(Map(filelist[0]))
                     if submap:
                         temp_im = temp_im.submap(*submap)
@@ -110,7 +114,7 @@ if rank == 0:
                 else:
                     pass
             if len(images) < wl+1:
-                if verbose: print 'Insufficient raw data - only found {} of 6 files. Downloading...'.format(len(images))
+                if verbose: print 'No data found for {}. Downloading...'.format(wlen)
                 client = vso.VSOClient()
                 qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
                                   vso.attrs.Wave(wlen, wlen),
@@ -119,6 +123,11 @@ if rank == 0:
                 dwpath = path.join(fits_dir.replace('*/*', '{:%m/%d}'.format(date)),
                                    '{file}')
                 res = client.get(qr, path=dwpath, site='NSO').wait()
+                temp_im = aiaprep(Map(res))
+                if submap:
+                    temp_im = temp_im.submap(*submap)
+                temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+                images.append(temp_im)
 
     # Normalise images to 171A if only using one parameter
     if n_params == 1:
@@ -158,7 +167,7 @@ if n_params == 1:
     heights = [1.0]
 else:
     widths = np.arange(0.1, 0.8, 0.1)
-    heights = 10.0 ** np.arange(20, 35, 0.1)
+    heights = 10.0 ** np.arange(20, 35.1, 0.1)
     # TODO: check if either of the above are sensible ranges of numbers
 parvals = np.array([i for i in product(temp, widths, heights)])
 n_vals = len(temp) * len(widths) * len(heights)
@@ -173,7 +182,12 @@ if rank == 0:
     except IOError:
         if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
         resp = load_temp_responses()
-        if verbose: print resp.max(axis=1)
+        if n_params == 1:
+            resp /= resp[2, :]
+            resp[np.isnan(resp)] = 0
+        if verbose:
+            print resp.min(axis=1), np.nanmin(resp, axis=1)
+            print resp.max(axis=1), np.nanmax(resp, axis=1)
         logt = np.arange(0, 15.05, 0.05)
         delta_t = logt[1] - logt[0]
         model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
@@ -182,6 +196,9 @@ if rank == 0:
             dem = gaussian(logt, *params)
             f = resp * dem
             model[p, :] = np.sum(f, axis=1) * delta_t
+        if verbose:
+            print model.max(axis=0)
+            print model[np.isnan(model)].size
         if n_params == 1:
             normmod = model[:, 2].reshape((n_vals, 1))
             model /= normmod
@@ -195,6 +212,8 @@ model = comm.bcast(model, root=0)
 if verbose:
     if rank == 0: print 'Calculating temperature values...'
     print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
+    print [im.max() for im in images]
+    print model.max(axis=0)
 if n_params == 1:
     parvals = parvals[:, 0]
 temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
@@ -213,6 +232,6 @@ if rank == 0:
         temp[:, mini:maxi, :] = temps[p]
         if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
     temps = temp
-    if verbose: print 'End ct', temps.shape
+    if verbose: print 'End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean()
     tempmap = GenericMap(temps, header)
     tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
