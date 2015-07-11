@@ -5,330 +5,37 @@ Created on Thu Jun  5 15:15:09 2014
 @author: drew
 """
 
+from matplotlib import use
+use('agg')
 import matplotlib.pyplot as plt
-from matplotlib import cm
+from matplotlib import cm, _cm
 from matplotlib import patches
 import numpy as np
-import datetime as dt
 import sunpy
-from sunpy.net import vso
 from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
+from sys import argv
+from os import path, makedirs
+import subprocess32 as subp
 from scipy.io.idl import readsav as read
-from astropy import units as u
-from os import system as sys
-#import numexpr as ne
-try:
-    from fits import calc_fits
-except ImportError:
-    print 'Current extension is broken, missing or incompatible.\n'\
-        +'Compiling Fortran extension.'
-    sys('f2py -c -m fits fitsmodule.f90')
-    from fits import calc_fits
-
-home = '/media/huw/'
-
-def gaussian(x, mean=0.0, std=1.0, amp=1.0):
-    """Simple function to return a Gaussian distribution"""
-    if isinstance(x, list):
-        x = np.array(x)
-    power = -((x - mean) ** 2.0) / (2.0 * (std ** 2.0))
-    f = amp * np.exp(power)
-    if amp == 1:
-        f = f / max(f)
-    return f
+import glob
 
 
-def load_temp_responses(n_wlens=6, corrections=True):
-    resp = np.zeros((n_wlens, 301))
-    try:
-        tresp = read(home + 'aia_tresp')
-    except IOError:
-        tresp = read('/imaps/holly/home/ajl7/aia_tresp')
-    resp[0, 80:181] = tresp['resp94']
-    resp[1, 80:181] = tresp['resp131']
-    resp[2, 80:181] = tresp['resp171']
-    resp[3, 80:181] = tresp['resp193']
-    resp[4, 80:181] = tresp['resp211']
-    resp[5, 80:181] = tresp['resp335']
-    if n_wlens > 6:
-        resp[6, 80:181] = tresp['resp304']
-    if corrections:
-        # Add empirical correction factor for 9.4nm response function below log(T)=6.3
-        # (see Aschwanden et al 2011)
-        resp[0:126, 0] = resp[0:126, 0]*6.7
-    
-    return resp
-
-
-def find_temp(images, t0=5.6, force_temp_scan=False, maps_dir=home+'temperature_maps/'):
-    x, y = images[0].shape
-    n_wlens = len(images)
-    n_temps = int((7.0 - t0) / 0.01) + 1
-    temp = np.arange(t0, 7.01, 0.01)
-    
-    try:
-        if force_temp_scan:
-            raise IOError
-        model = np.memmap(filename=home+'synth_emiss_1pars', dtype='float32',
-                          mode='r', shape=(n_temps, n_wlens))
-    except IOError:
-        print 'No synthetic emission data found. Re-scanning temperature range.'
-        resp = load_temp_responses()
-        logt = np.arange(0, 15.05, 0.05)
-        # Assume a width of the gaussian DEM distribution and normalise the height
-        width = 0.1
-        height = 1.0
-        delta_t = logt[1] - logt[0]
-        model = np.memmap(filename=home+'synth_emiss_1pars', dtype='float32',
-                          mode='w+', shape=(n_temps, n_wlens))
-        for t, meantemp in enumerate(temp):
-            dem = gaussian(logt, meantemp, width, height)
-            f = resp * dem
-            model[t, :] = np.sum(f, axis=1) * delta_t ### CHECK THIS AXIS!
-            normmod = model[t, 2]
-            model[t, :] = model[t, :] / normmod
-        model.flush()
-    ims_array = np.array([im.data for im in images])
-    print 'Calculating temperature values...',
-    temps, fits = calc_fits(ims_array, model, temp, n_temps, n_wlens, x, y, 1)
-    print 'Done.'
-    tempmap = temps[:, :, 0], images[2].meta.copy(), fits
-    # TODO: figure out how to change things in the header and save them.
-    
-    return tempmap
-
-
-"""def find_temp_3params(aiamaps, t0, force_temp_scan=False, maps_dir=home+'temperature_maps/'):
-    """"""from mpi4py import MPI
-    #fcomm = MPI.COMM_WORLD.py2f()
-    
-    comm = MPI.COMM_WORLD
-    size = comm.Get_size()
-    rank = comm.Get_rank()""""""
-    
-    if rank == 0:
-        ims_array = np.array([im.data for im in aiamaps])
-        n = ims_array.shape[-1]
-        print ims_array.shape, n
-        images = np.array([ims_array[:, :, r*(n/size):(r+1)*(n/size)] for r in range(size)])
-    images = comm.scatter(images, root=0)
-    print rank, images.shape
-    
-    #x, y = images[0].shape
-    x, y = images.shape[-2], images.shape[-1]
-    n_wlens = images.shape[0]#len(images)
-    temp = np.arange(t0, 7.01, 0.01)
-    n_temps = len(temp)
-    wid = np.arange(0.1, 1.1, 0.1) # Just copying Aschwanden's range here
-    n_widths = len(wid)
-    hei = np.arange(15, 30)
-    n_heights = len(hei)
-    n_vals = n_temps * n_widths * n_heights
-    params = np.zeros((n_vals, 3))
-    
-    try:
-        if force_temp_scan:
-            raise IOError
-        model = np.memmap(filename=home+'synth_emiss_3pars', dtype='float32',
-                          mode='r',shape=(n_vals, 1, 1, n_wlens))
-    except IOError:
-        if rank == 0:
-            resp = load_temp_responses()
-            logt = np.arange(0, 15.05, 0.05)
-            delta_t = logt[1] - logt[0]
-            model = np.memmap(filename=home+'synth_emiss_3pars', dtype='float32',
-                              mode='w+', shape=(n_vals, 1, 1, n_wlens))
-            #   For given gaussian width, height and centre:
-            for w, width in enumerate(wid):
-                for h, height in enumerate(hei):
-                    for t, meantemp in enumerate(temp):
-                        # Define linear index in model for this set of parameters
-                        i = w + h + t
-                        # Store these parameters for use later
-                        params[i, :] = [meantemp, height, width]
-                        # For each channel k:
-                        # intensity(k, params) <- sum(temperature_response(k, params) * DEM(params)) * dT
-                        dem = gaussian(logt, meantemp, width, height)
-                        model[i, 0, 0, :] = np.sum(resp * dem, axis=1) * delta_t
-                        #normmod = model[t, 0, 0, 2]
-                        #model[i, 0, 0, :] = model[i, 0, 0, :] / normmod
-            model.flush()
-        model = comm.bcast(model, root=0)
-    # ----- Load raw AIA data -----
-    #   if lvl 1.5 data is not present:
-    #       if lvl 1 data is not present:
-    #           download lvl 1 data
-    #       process lvl 1 data to lvl 1.5
-    #       save lvl 1.5 data
-    #   load lvl 1.5 data (into MapCube?)
-    # For now, stick with what I was doing before
-    """"""ims_array = np.memmap(filename=home+'images', dtype='float32', mode='w+',
-                      shape=(1, x, y, n_wlens))""""""
-    #ims_array = np.array([im.data for im in images])
-    """"""for i, im in enumerate(images):
-        ims_array[0, :, :, i] = im.data""""""
-    
-    # Create MapCube containing separate maps for temperature, emission measure
-    # and DEM width
-    # Possibly also add a map for density
-    
-    print 'Finding best Gaussian parameter values...',
-    #best_params = calc_fits(fcomm, ims_array, model, params, n_vals, n_wlens, x, y, 3)
-    best_params = calc_fits(images, model, params, n_vals, n_wlens, x, y, 3)
-    #best_params = calc_fits_py(ims_array, model, params, n_vals, n_wlens, x, y)
-    print 'Done.'
-    print rank, best_params.shape
-    #tempmap = best_params[:, :, 0], images[2].meta.copy()
-    #print tempmap[0].shape
-    #print tempmap[0].min(), tempmap[0].mean(), tempmap[0].max()
-    tempdata = best_params[:, :, 0]
-    tempmap = comm.gather(tempdata, root=0), aiamaps[2]
-    # TODO: figure out how to change things in the header and save them.
-    
-    """"""tempmap = comm.Gather(tempmap, root=0)
-    if rank == 0:
-        print images.shape""""""
-    
-    return tempmap"""
-
-
-def create_tempmap(date, n_params=1, data_dir=home+'SDO_data/',
-                   maps_dir=home+'temperature_maps/'):
-    wlens = ['94', '131', '171', '193', '211', '335']
-    t0 = 5.6
-    images = []
-    #imdates = {}
-    
-    print 'Finding data for {}.'.format(date.date())
-    # Loop through wavelengths
-    for wl, wlen in enumerate(wlens):
-        #print 'Finding {}A data...'.format(wlen),
-        fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
-        filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
-        temp_im = Map(filename)
-        # Download data if not enough found
-        client = vso.VSOClient()
-        if temp_im == []:
-            print 'File not found. Downloading from VSO...'
-            # Wavelength value for query needs to be an astropy Quantity
-            wquant = u.Quantity(value=int(wlen), unit='Angstrom')
-            qr = client.query(vso.attrs.Time(date,# - dt.timedelta(seconds=6),
-                                             date + dt.timedelta(seconds=12)),#6)),
-                              vso.attrs.Wave(wquant, wquant),
-                              vso.attrs.Instrument('aia'),
-                              vso.attrs.Provider('JSOC'))
-            res = client.get(qr, path=fits_dir+'{file}', site='NSO').wait()
-            temp_im = Map(res)
-        if temp_im == []:
-            print 'Downloading failed.'
-            print res, len(qr), qr
-            return np.zeros((512, 512)), None, None
-        if isinstance(temp_im, list):
-            temp_im = temp_im[0]
-        # TODO: save out level 1.5 data so it can be loaded quickly.
-        temp_im = aiaprep(temp_im)
-        temp_im.data = temp_im.data / temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
-        images.append(temp_im)
-        #imdates[wlen] = temp_im.date
-    
-    normim = images[2].data.copy()
-    # Normalise images to 171A
-    print 'Normalising images'
-    for i in range(len(wlens)):
-        images[i].data = images[i].data / normim
-    
-    # Produce temperature map
-    if n_params == 1:
-        tempmap = find_temp(images, t0)#, force_temp_scan=True)
-    else:
-        #tempmap = find_temp_3params(images, t0)
-        pass
-
-    return tempmap
-
-
-def calculate_temperatures(date, n_params=1, data_dir=home+'SDO_data/',
-                            maps_dir=home+'temperature_maps/', n_procs=4):
-    wlens = ['94', '131', '171', '193', '211', '335']
-    client = vso.VSOClient()
-    print 'Finding data for {}.'.format(date.date())
-    # Loop through wavelengths
-    for wl, wlen in enumerate(wlens):
-        #print 'Finding {}A data...'.format(wlen),
-        fits_dir = data_dir + '{}/{:%Y/%m/%d}/'.format(wlen, date)
-        filename = fits_dir + 'aia*{0}*{1:%Y?%m?%d}?{1:%H?%M}*lev1?fits'.format(wlen, date)
-        temp_im = Map(filename)
-        # Download data if not enough found
-        if temp_im == []:
-            print 'File not found. Downloading from VSO...'
-            qr = client.query(vso.attrs.Time(date,# - dt.timedelta(seconds=6),
-                                             date + dt.timedelta(seconds=12)),#6)),
-                              vso.attrs.Wave(wlen, wlen),
-                              vso.attrs.Instrument('aia'),
-                              vso.attrs.Provider('JSOC'))
-            res = client.get(qr, path=fits_dir+'{file}', site='NSO',
-                             methods=['URL_FILE_Rice']).wait()
-
-    n_wlens = len(wlens)
-    temp = np.arange(5.6, 7.01, 0.01)
-    n_temps = len(temp)
-    if n_params == 1:
-        wid = [0.1]
-        hei = [1.0]
-    else:
-        wid = np.arange(0.1, 1.1, 0.1) # Just copying Aschwanden's range here
-        hei = np.arange(15, 31)
-    n_widths = len(wid)
-    n_heights = len(hei)
-    n_vals = n_temps * n_widths * n_heights
-    
-    try:
-        #raise IOError
-        model = np.memmap(filename=home+'synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='r', shape=(n_vals, n_wlens))
-        params = np.loadtxt(home+'gaussian_parameters_{}'.format(n_params))
-    except IOError:
-        resp = load_temp_responses()
-        logt = np.arange(0, 15.05, 0.05)
-        delta_t = logt[1] - logt[0]
-        model = np.memmap(filename=home+'synth_emiss_{}pars'.format(n_params),
-                          dtype='float32', mode='w+', shape=(n_vals, n_wlens))
-        params = np.zeros((n_vals, n_params))
-        # Define linear index in model for this set of parameters
-        i = 0
-        #   For given gaussian width, height and centre:
-        for width in wid:
-            for height in hei:
-                for meantemp in temp:
-                    # For each channel k:
-                    # intensity(k, params) <- sum(temperature_response(k, params) * DEM(params)) * dT
-                    dem = gaussian(logt, float(meantemp), width, height)
-                    model[i, :] = np.sum(resp * dem, axis=1) * delta_t
-                    normmod = model[i, 2]
-                    model[i, :] = model[i, :] / normmod
-                    # Store these parameters for use later
-                    params[i, :] = [meantemp, width, height]
-                    i += 1
-        model.flush()
-        np.savetxt(home+'gaussian_parameters_{}'.format(n_params), params)
-
-    sys('mpirun -np {} -host localhost python parallel_ext.py {}T{} {} {}'.format(
-            n_procs, date.date(), date.time(), n_params, n_vals))
-    
-    return
+home = path.expanduser('~')
+cortemps = path.join(home, 'CoronaTemps')
 
 
 class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
-                 fname=None):
-        if (not fname and not date):# or (fname and date):
-            print """"You must specify either a date and time for which to create
+                 fname=None, infofile=None, submap=None, verbose=False,
+                 force_temp_scan=False):
+        if (not fname and not date) or (fname and date):
+            print """You must specify either a date and time for which to create
                 temperatures or the name of a file containing a valid 
                 TemperatureMap object."""
             return
 
-        if date and not fname:
+        if date:
             date = sunpy.time.parse_time(date)
         
             if data_dir is None:
@@ -336,38 +43,69 @@ class TemperatureMap(GenericMap):
             if maps_dir is None:
                 maps_dir='/media/huw/temperature_maps/{}pars/'.format(n_params)
             
-            fname = maps_dir+'data/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date)
+            fname = path.join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+
+        if infofile:
+            data_dir = None
+            maps_dir = open(infofile).readline()[:-1]
+            fname = path.join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+            fname.replace('/images/', '/data/')
+
+        if n_params != 1:
+            fname = fname.replace('.fits', '_full.fits')
+
+        if fname and not date:
+            data_dir = path.dirname(fname)
+
+        if verbose: print fname, data_dir
 
         try:
-            #raise ValueError
-            #fname = maps_dir+'data/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date)
             newmap = Map(fname)
-            GenericMap.__init__(self, newmap.data, newmap.meta)
-            #self.data = newmap.data
-            #self.meta = newmap.meta
+            GenericMap.__init__(self, newmap.data[..., 0], newmap.meta)
+            self.goodness_of_fit = newmap.data[..., -1]
+            if newmap.data.shape[2] != 2:
+                self.dem_width = newmap.data[..., 1]
+                self.emission_measure = newmap.data[..., 2]
         except ValueError:
-            if n_params == 3:
-                calculate_temperatures(date, n_params, data_dir, maps_dir, 8)
-                newmap = Map('temp.fits')
-                GenericMap.__init__(self, newmap.data[:, :, 0], newmap.meta)
-            else:
-                #data, meta = create_tempmap(date, n_params, data_dir, maps_dir)
-                data, meta, fit = create_tempmap(date, n_params, data_dir, maps_dir)
-                GenericMap.__init__(self, data, meta)
-                centre_x = self.reference_pixel['x']
-                centre_y = self.reference_pixel['y']
-                x_grid, y_grid = np.mgrid[-centre_x:centre_x-1, -centre_y:centre_y-1]
-                r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
-                self.data[r_grid > centre_x * 1.15] = None
-            #self.data = data
-            #self.meta = meta
+            cmdargs = ["python", path.join(cortemps, 'create_tempmap.py'),
+                date, n_params, data_dir, infofile, submap, verbose, force_temp_scan]
+            if n_params != 1:
+                cmdargs = ["mpiexec", "-n", 16] + cmdargs
+            cmdargs = [str(cmd) for cmd in cmdargs]
+            status = subp.call(cmdargs)
+            newmap = Map(path.join(cortemps, 'temporary.fits'))
+            subp.call(["rm", path.join(cortemps, 'temporary.fits')])
+            data, meta = newmap.data, newmap.meta
+            if verbose: print data.shape
+            GenericMap.__init__(self, data[..., 0], meta)
+            if data.shape[2] != 2:
+                data[data == 0] = np.nan
+                self.dem_width = data[..., 1]
+                self.emission_measure = data[..., 2]
+            self.goodness_of_fit = data[..., -1]
+            if verbose:
+                print self.shape
+                print self.goodness_of_fit.shape
+                if n_params != 1:
+                    print self.dem_width.shape
+                    print self.emission_measure.shape
+            lowx, highx = (self.xrange[0] / self.scale['x'],
+                           self.xrange[1] / self.scale['x'])
+            lowy, highy = (self.yrange[0] / self.scale['y'],
+                           self.yrange[1] / self.scale['y'])
+            x_grid, y_grid = np.mgrid[lowx:highx-1, lowy:highy-1]
+            r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
+            outer_rad = (self.rsun_arcseconds * 1.5) / self.scale['x']
+            self.data[r_grid > outer_rad] = None
+            self.meta['date-obs'] = str(date)
 
-        #self.date = date
-        self.meta['date-obs'] = str(date)
+        tmapcubehelix = _cm.cubehelix(s=2.8, r=0.7, h=2.0, gamma=1.0)
+        cm.register_cmap(name='temphelix', data=tmapcubehelix)
+        self.cmap = cm.get_cmap('temphelix')
+
         self.data_dir = data_dir
         self.maps_dir = maps_dir
         self.temperature_scale = 'log'
-        self.cmap = cm.coolwarm
         self.region = None
         self.region_coordinate = {'x': 0.0, 'y': 0.0}
         if n_params == 3:
@@ -375,12 +113,6 @@ class TemperatureMap(GenericMap):
         else:
             self.n_params = 1
 
-        """if n_params != 1:
-            alldata = self.data
-            self.data = alldata[:, :, 0]
-            self.EM = alldata[:, :, 1]
-            self.width = alldata[:, :, 2]"""
-        
         return
     
     @classmethod
@@ -405,12 +137,11 @@ class TemperatureMap(GenericMap):
         """
         Function to highlight user-defined temperatures
         """
-        splitmap = TemperatureMap(np.ones(self.data.shape)*np.NaN,
-                                  self.meta.copy())
+        newdata = np.ones(self.data.shape) * np.NaN
         indices = np.where((self.data > mintemp) * (self.data < maxtemp))
-        splitmap.data[indices] = splitmap.data[indices]
+        newdata[indices] = self.data[indices]
         
-        return splitmap
+        return Map(newdata, self.meta.copy())
     
     def convert_scale(self, scale='linear'):
         if self.temperature_scale == scale:
@@ -426,10 +157,6 @@ class TemperatureMap(GenericMap):
         return
     
     def compare(self, display_wlen='171', context_wlen=None, extra_maps=[]):
-        #        temp_args=None, temp_kwargs=None,
-        #        wlen_args=None, wlen_kwargs=None,
-        #        ctxt_args=None, ctxt_kwargs=None,
-        #        extr_args=None, extr_kwargs=None):
         valid_wlens = ['94', '131', '171', '195', '211', '335', '304', 'hmi']
         if display_wlen.lower() not in valid_wlens:
             print "Display wavelength provided invalid or None."
@@ -482,20 +209,17 @@ class TemperatureMap(GenericMap):
             thismap.plot()#*extr_args, **extr_kwargs)
         
         if save_output:
-            error = sys('touch '+maps_dir+'maps/{:%Y/%m/%d/} > shelloutput.txt'.format(date))
-            if error != 0:
-                sys('{0}{1:%Y}; {0}{1:%Y/%m}; {0}{1:%Y/%m/%d} > shelloutput.txt'\
-                        .format('mkdir '+maps_dir+'maps/', date))
-            filename = maps_dir+'maps/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}_with{}'.\
-                    format(date, display_wlen)
+            savedir = path.join(maps_dir, 'maps/{:%Y/%m/%d}'.format(date))
+            if not path.exists(savedir):
+                makedirs(savedir)
+            filename = path.join(maps_dir, '{%Y-%m-%dT%H:%M:%S}_with{}'.format(date, display_wlen))
             plt.savefig(filename)
             if self.region != None:
-                reg_dir = maps_dir + 'maps/region_maps'
-                reg_dir = reg_dir + '/{}/'. format(self.region)
-                error = sys('touch ' + reg_dir + ' > shelloutput.txt')
-                if error != 0:
-                    sys('mkdir ' + reg_dir + ' > shelloutput.txt')
-                plt.savefig(reg_dir+'{:%Y-%m-%dT%H:%M:%S}'.format(date))
+                reg_dir = path.join(maps_dir,
+                                    'maps/region_maps/{}/'. format(self.region))
+                if not path.exists(reg_dir):
+                    makedirs(reg_dir)
+                plt.savefig(path.join(reg_dir, '{:%Y-%m-%dT%H:%M:%S}'.format(date)))
             plt.close()
         else:
             plt.show()
@@ -516,10 +240,106 @@ class TemperatureMap(GenericMap):
     
     def save(self):
         date = sunpy.time.parse_time(self.date)
-        error = sys('touch '+self.maps_dir+'data/{:%Y/%m/%d/} > shelloutput.txt'.format(date))
-        if error != 0:
-            sys('{0}{1:%Y}; {0}{1:%Y/%m}; {0}{1:%Y/%m/%d} > shelloutput.txt'.format(
-                'mkdir '+self.maps_dir+'data/', date))
-        GenericMap.save(self, self.maps_dir+'data/{:%Y/%m/%d/%Y-%m-%dT%H:%M:%S}.fits'.format(date), clobber=True)
+        if not path.exists(self.maps_dir):
+            makedirs(self.maps_dir)
+        fname = path.join(self.maps_dir,
+                          '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+        alldata = np.zeros((self.shape[0], self.shape[1], self.n_params+1))
+        alldata[..., 0] = self.data
+        if self.n_params != 1:
+            fname = fname.replace('.fits', '_full.fits')
+            alldata[..., 1] = self.dem_width
+            alldata[..., 2] = self.emission_measure
+        alldata[..., -1] = self.goodness_of_fit
+        outmap = Map(alldata, self.meta.copy())
+        outmap.save(fname, clobber=True)
+
+
+    def min(self):
+        return np.nanmin(self.data)
+
+    def mean(self):
+        return np.nanmean(self.data, dtype='float64')
+
+    def max(self):
+        return np.nanmax(self.data)
+
+    def std(self):
+        return np.nanstd(self.data, dtype='float64')
+
+    def calculate_em(self, wlen='171', dz=100, model=False):
+        """
+        Calculate an approximation of the coronal EmissionMeasure using a given
+        TemperatureMap object and a particular AIA channel.
+    
+        Parameters
+        ----------
+        tmap : CoronaTemps.temperature.TemperatureMap
+            A TemperatureMap instance containing coronal temperature data
+        wlen : {'94' | '131' | '171' | '193' | '211' | '335'}
+            AIA wavelength used to approximate the emission measure. '171', '193'
+            and '211' are most likely to provide reliable results. Use of other
+            channels is not recommended.
+        """
+        # Load the appropriate temperature response function
+        tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
+        resp = tresp['resp{}'.format(wlen)]
+    
+        # Get some information from the TemperatureMap and set up filenames, etc
+        tempdata = self.data.copy()
+        tempdata[np.isnan(tempdata)] = 0.0
+        date = sunpy.time.parse_time(self.date)
+        if not model:
+            data_dir = self.data_dir
+            fits_dir = path.join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
+            filename = path.join(fits_dir,
+                                 '*{0:%Y?%m?%d}?{0:%H?%M}*fits'.format(date))
+            if wlen == '94': filename = filename.replace('94', '094')
+    
+            # Load and appropriately process AIA data
+            filelist = glob.glob(filename)
+            if filelist == []:
+                print 'AIA data not found :('
+                return
+            aiamap = Map(filename)
+            aiamap.data /= aiamap.exposure_time
+            aiamap = aiaprep(aiamap)
+            aiamap = aiamap.submap(self.xrange, self.yrange)
+        else:
+            fname = '/imaps/holly/home/ajl7/CoronaTemps/data/synthetic/{}/model.fits'.format(wlen)
+            if wlen == '94': fname = fname.replace('94', '094')
+            aiamap = Map(fname)
+
+        # Create new Map and put EM values in it
+        emmap = Map(self.data.copy(), self.meta.copy())
+        indices = np.round((tempdata - 4.0) / 0.05).astype(int)
+        indices[indices < 0] = 0
+        indices[indices > 100] = 100
+        #print emmap.shape, indices.shape, tempdata.shape, aiamap.shape, resp.shape
+        emmap.data = np.log10(aiamap.data / resp[indices])
+        #emmap.data = aiamap.data / resp[indices]
+
+        emmapcubehelix = _cm.cubehelix(s=2.8, r=-0.7, h=1.4, gamma=1.0)
+        cm.register_cmap(name='emhelix', data=emmapcubehelix)
+        emmap.cmap = cm.get_cmap('emhelix')
+    
+        return emmap
+
 
 sunpy.map.Map.register(TemperatureMap, TemperatureMap.is_datasource_for)
+
+if __name__ == "__main__":
+    date = sunpy.time.parse_time(argv[1])
+    infofile = argv[2]    
+    tmap = TemperatureMap(date, infofile=infofile)
+    tmap.save()
+    
+    image_dir = open(infofile).readline()[:-1]
+    fname = path.join(image_dir, '{:%Y-%m-%dT%H_%M_%S}'.format(date))
+    print "Temperature map image saved to: {}".format(fname)
+    
+    fig = plt.figure(16, 12)
+    tmap.plot()
+    plt.colorbar(orientation='vertical')
+    plt.savefig(fname)
+    plt.close()

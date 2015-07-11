@@ -1,0 +1,8 @@
+#$ -S /bin/sh
+#$ -cwd
+#$ -q large.q
+
+module load gcc/4.8.1
+source ~/virtualenv-12.1.1/AR-tmaps-env/bin/activate
+cd /imaps/holly/home/ajl7/CoronaTemps/
+python full-gaussian.py
