@@ -28,7 +28,7 @@ from utils import gaussian, load_temp_responses
 from astropy.units import Unit
 try:
     from fits import calc_fits
-    print 'Fortran extension imported successfully'
+    #print 'Fortran extension imported successfully'
 except ImportError:
     print 'Current extension is broken, missing or incompatible.\n'\
         +'Compiling Fortran extension.'
@@ -89,7 +89,7 @@ if rank == 0:
                 images.append(Map(path.join(fits_dir, 'model.fits')))
                 continue
             else:
-                fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
+                fits_dir = path.join(data_dir, '{}'.format(wlen))
             if verbose: print 'Searching {} for AIA data'.format(fits_dir)
             timerange = tr(date - dt.timedelta(seconds=5),
                            date + dt.timedelta(seconds=11))
@@ -97,8 +97,8 @@ if rank == 0:
             times = [time.start() for time in timerange.split(ntimes)]
             for time in times:
                 filename = path.join(fits_dir,
-                    #'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
-                    'AIA{0:%Y%m%d_%H%M_*.fits}'.format(time))
+                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
+                    #'AIA{0:%Y%m%d_%H%M_*.fits}'.format(time))
                 if verbose: print filename
                 filelist = glob.glob(filename)
                 if verbose: print filelist
@@ -216,7 +216,15 @@ if verbose:
     print model.max(axis=0)
 if n_params == 1:
     parvals = parvals[:, 0]
-temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+temps, fitcurve = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+"""fig, ax = plt.subplots()
+plt.plot(parvals, fitcurve)
+ax.set_yscale('log')
+plt.ylabel('Goodness-of-fit')
+plt.xlabel('log(T)')
+plt.savefig(path.expanduser('~/thesis_plots/chapter2/fitsgraph'))
+plt.close()
+print '========\n', fitcurve.argmin(), fitcurve.shape, parvals[fitcurve.argmin()], parvals[44].shape, '\n========'"""
 # Convert EM values to log scale if there are any
 if temps.shape[2] > 2: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
