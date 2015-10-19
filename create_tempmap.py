@@ -216,7 +216,20 @@ if verbose:
     print model.max(axis=0)
 if n_params == 1:
     parvals = parvals[:, 0]
-temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+#temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+for i in range(x):
+    for j in range(y):
+        best_fit = 1e38 # Arbitrarily large number
+        for t in range(n_vals):
+            total_error = 0.0
+            for w in range(n_wlens)
+                error = abs(images[w,i,j] - model[t, w])
+                total_error += error
+            this_fit = total_error / float(n_wlens)
+            if this_fit < best_fit:
+                best_fit = this_fit
+                results[i, j, :n_params] = parvals[t]
+                results[i, j, n_params] = this_fit
 # Convert EM values to log scale if there are any
 if temps.shape[2] > 2: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
