@@ -222,7 +222,7 @@ for i in range(x):
         best_fit = 1e38 # Arbitrarily large number
         for t in range(n_vals):
             total_error = 0.0
-            for w in range(n_wlens)
+            for w in range(n_wlens):
                 error = abs(images[w,i,j] - model[t, w])
                 total_error += error
             this_fit = total_error / float(n_wlens)
