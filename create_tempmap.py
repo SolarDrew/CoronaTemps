@@ -123,6 +123,7 @@ if rank == 0:
                 dwpath = path.join(fits_dir.replace('*/*', '{:%m/%d}'.format(date)),
                                    '{file}')
                 res = client.get(qr, path=dwpath, site='NSO').wait()
+		if isinstance(res, list): res = res[0]
                 temp_im = aiaprep(Map(res))
                 if submap:
                     temp_im = temp_im.submap(*submap)
