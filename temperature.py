@@ -26,7 +26,7 @@ cortemps = path.join(home, 'CoronaTemps')
 
 
 class TemperatureMap(GenericMap):
-    def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
+    def __init__(self, date=None, n_params=1, data_path=None, maps_path=None, 
                  fname=None, infofile=None, submap=None, verbose=False,
                  force_temp_scan=False):
         if (not fname and not date) or (fname and date):
@@ -38,21 +38,21 @@ class TemperatureMap(GenericMap):
         if date:
             date = sunpy.time.parse_time(date)
         
-            if data_dir is None:
-                data_dir = '/media/huw/SDO_data/'
-            if maps_dir is None:
-                maps_dir='/media/huw/temperature_maps/{}pars/'.format(n_params)
-            
-            fname = path.join(maps_dir, '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+            if data_path is None:
+                data_path = path.join(cortemps, 'data', 
+                    '{0:%Y/%m/%d}/aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(date))
+            if map_path is None:
+                map_path = path.join(cortemps, 'temperature_maps', '{}pars',
+                    '{:%Y-%m-%dT%H_%M_%S}.fits'.format(n_params, date))
 
         if infofile:
             data_dir = None
-            maps_dir = open(infofile).readline()[:-1]
-            fname = path.join(maps_dir, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
+            map_path = open(infofile).readline()[:-1]
+            fname = path.join(map_path, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
             fname.replace('/images/', '/data/')
 
         if n_params != 1:
-            fname = fname.replace('.fits', '_full.fits')
+            map_path = map_path.replace('.fits', '_full.fits')
 
         if fname and not date:
             data_dir = path.dirname(fname)
@@ -68,7 +68,7 @@ class TemperatureMap(GenericMap):
                 self.emission_measure = newmap.data[..., 2]
         except ValueError:
             cmdargs = ["python", path.join(cortemps, 'create_tempmap.py'),
-                date, n_params, data_dir, infofile, submap, verbose, force_temp_scan]
+                date, n_params, data_path, infofile, submap, verbose, force_temp_scan]
             if n_params != 1:
                 cmdargs = ["mpiexec", "-n", 16] + cmdargs
             cmdargs = [str(cmd) for cmd in cmdargs]
@@ -103,8 +103,8 @@ class TemperatureMap(GenericMap):
         cm.register_cmap(name='temphelix', data=tmapcubehelix)
         self.cmap = cm.get_cmap('temphelix')
 
-        self.data_dir = data_dir
-        self.maps_dir = maps_dir
+        self.data_path = data_path
+        self.maps_path = maps_path
         self.temperature_scale = 'log'
         self.region = None
         self.region_coordinate = {'x': 0.0, 'y': 0.0}
@@ -163,8 +163,8 @@ class TemperatureMap(GenericMap):
             output = self.plot()#*temp_args, **temp_kwargs)
             return output
         save_output = True
-        data_dir = self.data_dir
-        maps_dir = self.maps_dir
+        data_path = self.data_path
+        maps_path = self.maps_path
         
         date = self.date
         nmaps = 2 + len(extra_maps)
@@ -179,7 +179,7 @@ class TemperatureMap(GenericMap):
         self.plot()#*temp_args, **temp_kwargs)
         plt.colorbar(orientation='horizontal')
         
-        displaymap = Map(data_dir+'{0}/{1:%Y/%m/%d}/aia*{0}*t{1:%H?%M}*lev1?fits'\
+        displaymap = Map(data_path+'{0}/{1:%Y/%m/%d}/aia*{0}*t{1:%H?%M}*lev1?fits'\
             .format(display_wlen, date))
         if isinstance(displaymap, list):
             displaymap = displaymap[0]
@@ -192,7 +192,7 @@ class TemperatureMap(GenericMap):
         
         if context_wlen and self.region != None:
             context_plot = fig.add_subplot(nrows, 1, nrows)
-            contextmap = Map(data_dir+'{0}/{1:%Y/%m/%d}/aia*{0}*t{1:%H?%M}*lev1?fits'.format(context_wlen, date))
+            contextmap = Map(data_path+'{0}/{1:%Y/%m/%d}/aia*{0}*t{1:%H?%M}*lev1?fits'.format(context_wlen, date))
             if isinstance(contextmap, list):
                 contextmap = contextmap[0]
             x, y = self.region_coordinate['x'], self.region_coordinate['y']
@@ -209,13 +209,13 @@ class TemperatureMap(GenericMap):
             thismap.plot()#*extr_args, **extr_kwargs)
         
         if save_output:
-            savedir = path.join(maps_dir, 'maps/{:%Y/%m/%d}'.format(date))
+            savedir = path.join(map_path, 'maps/{:%Y/%m/%d}'.format(date))
             if not path.exists(savedir):
                 makedirs(savedir)
-            filename = path.join(maps_dir, '{%Y-%m-%dT%H:%M:%S}_with{}'.format(date, display_wlen))
+            filename = path.join(map_path, '{%Y-%m-%dT%H:%M:%S}_with{}'.format(date, display_wlen))
             plt.savefig(filename)
             if self.region != None:
-                reg_dir = path.join(maps_dir,
+                reg_dir = path.join(map_path,
                                     'maps/region_maps/{}/'. format(self.region))
                 if not path.exists(reg_dir):
                     makedirs(reg_dir)
@@ -240,9 +240,9 @@ class TemperatureMap(GenericMap):
     
     def save(self):
         date = sunpy.time.parse_time(self.date)
-        if not path.exists(self.maps_dir):
-            makedirs(self.maps_dir)
-        fname = path.join(self.maps_dir,
+        if not path.exists(self.map_path):
+            makedirs(self.map_path)
+        fname = path.join(self.map_path,
                           '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         alldata = np.zeros((self.shape[0], self.shape[1], self.n_params+1))
         alldata[..., 0] = self.data
@@ -290,9 +290,9 @@ class TemperatureMap(GenericMap):
         tempdata[np.isnan(tempdata)] = 0.0
         date = sunpy.time.parse_time(self.date)
         if not model:
-            data_dir = self.data_dir
-            fits_dir = path.join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
-            filename = path.join(fits_dir,
+            data_path = self.data_path
+            fits_dir = path.join(data_path, '{:%Y/%m/%d}/{}'.format(date, wlen))
+            filename = path.join(fits_path,
                                  '*{0:%Y?%m?%d}?{0:%H?%M}*fits'.format(date))
             if wlen == '94': filename = filename.replace('94', '094')
     

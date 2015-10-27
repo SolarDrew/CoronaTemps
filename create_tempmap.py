@@ -51,7 +51,7 @@ for a in argv[1:]:
             continue
     args.append(a)
 
-date, n_params, data_dir, datfile, submap, verbose, force_temp_scan = args
+date, n_params, data_path, datfile, submap, verbose, force_temp_scan = args
 
 wlens = ['094', '131', '171', '193', '211', '335']
 t0 = 5.6
@@ -78,51 +78,36 @@ if rank == 0:
                         wlenmap.data += thismap.data
                     wlenmap.data /= len(allwlenmaps)
                     images[thiswlen] = wlenmap
- 
+
         images = [images[w] for w in wlens]
     else:
         images = []
-        #imagefiles = []
         for wl, wlen in enumerate(wlens):
             if date == 'model':
                 fits_dir = path.join(data_dir, 'synthetic', wlen)
                 images.append(Map(path.join(fits_dir, 'model.fits')))
                 continue
             else:
-                fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
-            if verbose: print 'Searching {} for AIA data'.format(fits_dir)
-            timerange = tr(date - dt.timedelta(seconds=5),
-                           date + dt.timedelta(seconds=11))
-            ntimes = int(timerange.seconds())
-            times = [time.start() for time in timerange.split(ntimes)]
-            for time in times:
-                filename = path.join(fits_dir,
-                    #'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
-                    'AIA{0:%Y%m%d_%H%M_*.fits}'.format(time))
-                if verbose: print filename
-                filelist = glob.glob(filename)
-                if verbose: print filelist
-                if filelist != []:
-                    if verbose: print 'File found: ', filelist[0]
-                    #imagefiles.append(filelist[0])
-                    temp_im = aiaprep(Map(filelist[0]))
-                    if submap:
-                        temp_im = temp_im.submap(*submap)
-                    temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
-                    images.append(temp_im)
-                    break
-                else:
-                    pass
-            if len(images) < wl+1:
+                fits_path = data_path.format(date, wlen))
+            if verbose: print 'Searching for AIA data: {}...'.format(fits_path)
+            filelist = glob.glob(filename)
+            if filelist != []:
+                print 'Found file: {}'.format(filelist[0])
+                temp_im = aiaprep(Map(filelist[0]))
+                if submap:
+                    temp_im = temp_im.submap(*submap)
+                temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+                images.append(temp_im)
+                break
+            else:
                 if verbose: print 'No data found for {}. Downloading...'.format(wlen)
                 client = vso.VSOClient()
                 qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
                                   vso.attrs.Wave(wlen, wlen),
                                   vso.attrs.Instrument('aia'),
                                   vso.attrs.Provider('JSOC'))
-                dwpath = path.join(fits_dir.replace('*/*', '{:%m/%d}'.format(date)),
-                                   '{file}')
-                res = client.get(qr, path=dwpath, site='NSO').wait()
+                res = client.get(qr, path=fits_path, site='NSO').wait()
+                if isinstance(res, list): res = res[0]
                 temp_im = aiaprep(Map(res))
                 if submap:
                     temp_im = temp_im.submap(*submap)
