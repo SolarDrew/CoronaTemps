@@ -21,7 +21,7 @@ from scipy.io.idl import readsav as read
 import glob
 
 
-home = path.expanduser('~')
+home = path.expanduser('~/macrospicules_paper/')
 cortemps = path.join(home, 'CoronaTemps')
 
 

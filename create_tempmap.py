@@ -32,11 +32,11 @@ try:
 except ImportError:
     print 'Current extension is broken, missing or incompatible.\n'\
         +'Compiling Fortran extension.'
-    system(path.expanduser('f2py -c -m fits ~/CoronaTemps/fitsmodule.f90'))
+    system(path.expanduser('f2py -c -m fits ~/macrospicules_paper/CoronaTemps/fitsmodule.f90'))
     from fits import calc_fits
 
 
-home = path.expanduser('~')
+home = path.expanduser('~/macrospicules_paper/')
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
@@ -234,4 +234,4 @@ if rank == 0:
     temps = temp
     if verbose: print 'End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean()
     tempmap = GenericMap(temps, header)
-    tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
+    tempmap.save(path.expanduser('~/macrospicules_paper/CoronaTemps/temporary.fits'))
