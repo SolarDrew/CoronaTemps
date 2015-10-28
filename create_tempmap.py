@@ -41,6 +41,8 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
+print home, comm, rank, size
+
 args = []
 for a in argv[1:]:
     for f in [eval, sunpy.time.parse_time]:
@@ -52,6 +54,7 @@ for a in argv[1:]:
     args.append(a)
 
 date, n_params, data_path, datfile, submap, verbose, force_temp_scan = args
+print args
 
 wlens = ['094', '131', '171', '193', '211', '335']
 t0 = 5.6
@@ -88,7 +91,7 @@ if rank == 0:
                 images.append(Map(path.join(fits_dir, 'model.fits')))
                 continue
             else:
-                fits_path = data_path.format(date, wlen))
+                fits_path = data_path.format(date, wlen)
             if verbose: print 'Searching for AIA data: {}...'.format(fits_path)
             filelist = glob.glob(filename)
             if filelist != []:

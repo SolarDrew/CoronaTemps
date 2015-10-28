@@ -26,7 +26,7 @@ cortemps = path.join(home, 'CoronaTemps')
 
 
 class TemperatureMap(GenericMap):
-    def __init__(self, date=None, n_params=1, data_path=None, maps_path=None, 
+    def __init__(self, date=None, n_params=1, data_path=None, map_path=None, 
                  fname=None, infofile=None, submap=None, verbose=False,
                  force_temp_scan=False):
         if (not fname and not date) or (fname and date):
@@ -46,7 +46,7 @@ class TemperatureMap(GenericMap):
                     '{:%Y-%m-%dT%H_%M_%S}.fits'.format(n_params, date))
 
         if infofile:
-            data_dir = None
+            data_path = None
             map_path = open(infofile).readline()[:-1]
             fname = path.join(map_path, '{:%Y-%m-%dT%H:%M:%S}.fits'.format(date))
             fname.replace('/images/', '/data/')
@@ -55,9 +55,9 @@ class TemperatureMap(GenericMap):
             map_path = map_path.replace('.fits', '_full.fits')
 
         if fname and not date:
-            data_dir = path.dirname(fname)
+            data_path = path.dirname(fname)
 
-        if verbose: print fname, data_dir
+        if verbose: print fname, data_path
 
         try:
             newmap = Map(fname)
@@ -72,7 +72,9 @@ class TemperatureMap(GenericMap):
             if n_params != 1:
                 cmdargs = ["mpiexec", "-n", 16] + cmdargs
             cmdargs = [str(cmd) for cmd in cmdargs]
+            print cmdargs
             status = subp.call(cmdargs)
+            print '--------\n', status, '\n--------'
             newmap = Map(path.join(cortemps, 'temporary.fits'))
             subp.call(["rm", path.join(cortemps, 'temporary.fits')])
             data, meta = newmap.data, newmap.meta
