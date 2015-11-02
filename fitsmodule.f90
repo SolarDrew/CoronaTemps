@@ -1,3 +1,9 @@
+PROGRAM dummy
+
+  IMPLICIT NONE
+
+END PROGRAM
+
 SUBROUTINE calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_pars, results)
 
 IMPLICIT NONE
