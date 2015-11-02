@@ -67,10 +67,12 @@ class TemperatureMap(GenericMap):
                 self.dem_width = newmap.data[..., 1]
                 self.emission_measure = newmap.data[..., 2]
         except ValueError:
-            cmdargs = ["python", path.join(cortemps, 'create_tempmap.py'),
-                date, n_params, data_path, infofile, submap, verbose, force_temp_scan]
             if n_params != 1:
-                cmdargs = ["mpiexec", "-n", 16] + cmdargs
+                n_procs = 16
+            else:
+                n_procs = 1
+            cmdargs = ["mpiexec", "-n", n_procs, "python", path.join(cortemps, 'create_tempmap.py'),
+                date, n_params, data_path, infofile, submap, verbose, force_temp_scan]
             cmdargs = [str(cmd) for cmd in cmdargs]
             print cmdargs
             status = subp.call(cmdargs)
