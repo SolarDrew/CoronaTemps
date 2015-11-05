@@ -91,7 +91,7 @@ if rank == 0:
                 images.append(Map(path.join(fits_dir, 'model.fits')))
                 continue
             else:
-                fits_path = data_path.format(date, wlen)
+                fits_path = data_path.format(d=date, w=wlen)
             if verbose: print 'Searching for AIA data: {}...'.format(fits_path)
             filelist = glob.glob(filename)
             if filelist != []:
