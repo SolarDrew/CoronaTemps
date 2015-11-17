@@ -56,7 +56,7 @@ for a in argv[1:]:
 date, n_params, data_path, datfile, submap, verbose, force_temp_scan = args
 print args
 
-wlens = ['094', '131', '171', '193', '211', '335']
+wlens = ['94', '131', '171', '193', '211', '335']
 t0 = 5.6
 thiswlen = None
 
@@ -90,19 +90,27 @@ if rank == 0:
                 fits_dir = path.join(data_dir, 'synthetic', wlen)
                 images.append(Map(path.join(fits_dir, 'model.fits')))
                 continue
-            else:
-                fits_path = data_path.format(d=date, w=wlen)
-            if verbose: print 'Searching for AIA data: {}...'.format(fits_path)
-            filelist = glob.glob(filename)
-            if filelist != []:
-                print 'Found file: {}'.format(filelist[0])
-                temp_im = aiaprep(Map(filelist[0]))
-                if submap:
-                    temp_im = temp_im.submap(*submap)
-                temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
-                images.append(temp_im)
-                break
-            else:
+            if verbose: print 'Searching for AIA data: {}...'.format(data_path)
+            timerange = tr(date, date + dt.timedelta(seconds=11))
+            ntimes = int(timerange.seconds())
+            times = [time.start() for time in timerange.split(ntimes)]
+            for time in times:
+                fits_path = data_path.format(d=time, w=wlen)
+                if verbose: print fits_path,
+                filelist = glob.glob(fits_path)
+                if verbose: print filelist
+                if filelist != []:
+                    print 'Found file: {}'.format(filelist[0])
+                    temp_im = aiaprep(Map(filelist[0]))
+                    if submap:
+                        temp_im = temp_im.submap(*submap)
+                    temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
+                    images.append(temp_im)
+                    break
+                else:
+                    pass
+
+            if len(images) < wl + 1:
                 if verbose: print 'No data found for {}. Downloading...'.format(wlen)
                 client = vso.VSOClient()
                 qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
