@@ -284,7 +284,7 @@ class TemperatureMap(GenericMap):
             channels is not recommended.
         """
         # Load the appropriate temperature response function
-        tresp = read('/imaps/holly/home/ajl7/CoronaTemps/aia_tresp')
+        tresp = read(path.join(cortemps, 'aia_tresp'))
         resp = tresp['resp{}'.format(wlen)]
     
         # Get some information from the TemperatureMap and set up filenames, etc
