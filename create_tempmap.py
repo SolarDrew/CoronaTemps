@@ -135,7 +135,8 @@ if rank == 0:
     images = np.array([im.data for im in images])
 
 # Scatter image data to each process
-if rank == 0:
+if size > 1:
+  if rank == 0:
     #[images[..., (p/size)*images.shape[2]:((p+1)/size)*images.shape[2]] \
     #    for p in range(size)]
     temp = []
@@ -146,9 +147,9 @@ if rank == 0:
         if verbose: print p, mini, maxi, images[..., mini:maxi].shape
     images = temp
     if verbose: print len(images), images[0].shape
-else:
+  else:
     images = None
-images = comm.scatter(images, root=0)
+  images = comm.scatter(images, root=0)
 
 # Get dimensions of image
 x, y = images[0].shape
@@ -203,7 +204,8 @@ if rank == 0:
 else:
     model = None
 
-model = comm.bcast(model, root=0)
+if size > 1:
+    model = comm.bcast(model, root=0)
 
 if verbose:
     if rank == 0: print 'Calculating temperature values...'
@@ -218,7 +220,8 @@ if temps.shape[2] > 2: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
 
 # Get data all back in one place and save it
-temps = comm.gather(temps, root=0)
+if size > 1:
+  temps = comm.gather(temps, root=0)
 if rank == 0:
     if verbose: print len(temps), temps[0].shape
     temp = np.zeros(shape=(x, y*size, n_params+1))
