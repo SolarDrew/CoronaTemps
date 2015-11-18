@@ -5,7 +5,7 @@ Created on Thu Jun  5 15:15:09 2014
 @author: drew
 """
 
-from __future__ import division
+from __future__ import division, absolute_import
 from matplotlib import use
 use('agg')
 import matplotlib.pyplot as plt
@@ -97,8 +97,8 @@ if rank == 0:
             times = [time.start() for time in timerange.split(ntimes)]
             for time in times:
                 filename = path.join(fits_dir,
-                    #'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
-                    'AIA{0:%Y%m%d_%H%M_*.fits}'.format(time))
+                    'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
+                    #'AIA{0:%Y%m%d_%H%M_*.fits}'.format(time))
                 if verbose: print filename
                 filelist = glob.glob(filename)
                 if verbose: print filelist
