@@ -108,7 +108,7 @@ class TemperatureMap(GenericMap):
         self.cmap = cm.get_cmap('temphelix')
 
         self.data_path = data_path
-        self.maps_path = maps_path
+        self.map_path = map_path
         self.temperature_scale = 'log'
         self.region = None
         self.region_coordinate = {'x': 0.0, 'y': 0.0}
