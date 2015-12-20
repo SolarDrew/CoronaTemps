@@ -5,8 +5,6 @@ Created on Thu Jun  5 15:15:09 2014
 @author: drew
 """
 
-from matplotlib import use
-use('agg')
 import matplotlib.pyplot as plt
 from matplotlib import cm, _cm
 from matplotlib import patches
