@@ -230,13 +230,13 @@ if size > 1:
   temps = comm.gather(temps, root=0)
 if rank == 0:
     if verbose: print len(temps), temps[0].shape
-    temp = np.zeros(shape=(x, y*size, n_params+1))
+    """temp = np.zeros(shape=(x, y*size, n_params+1))
     for p in range(size):
         mini = (p/size)*temp.shape[1]
         maxi = ((p+1)/size)*temp.shape[1]
         temp[:, mini:maxi, :] = temps[p]
         if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
-    temps = temp
+    temps = temp"""
     if verbose: print 'End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean()
     tempmap = GenericMap(temps, header)
     tempmap.save(path.expanduser('/fastdata/sm1ajl/temporary.fits'))
