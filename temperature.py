@@ -77,8 +77,8 @@ class TemperatureMap(GenericMap):
             print cmdargs
             status = subp.call(cmdargs)
             print '--------\n', status, '\n--------'
-            newmap = Map(path.join(cortemps, 'temporary.fits'))
-            subp.call(["rm", path.join(cortemps, 'temporary.fits')])
+            newmap = Map(path.join('/fastdata', 'sm1ajl', 'temporary.fits'))
+            subp.call(["rm", path.join('/fastdata', 'sm1ajl', 'temporary.fits')])
             data, meta = newmap.data, newmap.meta
             if verbose: print data.shape
             GenericMap.__init__(self, data[..., 0], meta)
@@ -244,20 +244,21 @@ class TemperatureMap(GenericMap):
     
     def save(self):
         date = sunpy.time.parse_time(self.date)
-        if not path.exists(self.map_path):
-            makedirs(self.map_path)
-        fname = path.join(self.map_path,
-                          '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
+        if not path.exists(path.dirname(self.map_path)):
+            makedirs(path.dirname(self.map_path))
+        #fname = path.join(self.map_path,
+        #                  '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
         alldata = np.zeros((self.shape[0], self.shape[1], self.n_params+1))
         alldata[..., 0] = self.data
         if self.n_params != 1:
-            fname = fname.replace('.fits', '_full.fits')
+            fname = self.map_path.replace('.fits', '_full.fits')
             alldata[..., 1] = self.dem_width
             alldata[..., 2] = self.emission_measure
+        else:
+            fname = self.map_path
         alldata[..., -1] = self.goodness_of_fit
         outmap = Map(alldata, self.meta.copy())
         outmap.save(fname, clobber=True)
-
 
     def min(self):
         return np.nanmin(self.data)

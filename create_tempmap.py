@@ -125,6 +125,12 @@ if rank == 0:
                 temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                 images.append(temp_im)
 
+    for i, im in enumerate(images):
+        fig = plt.figure()
+        im.plot()
+        plt.savefig('/home/sm1ajl/test{}'.format(wlens[i]))
+        plt.close()
+
     # Normalise images to 171A if only using one parameter
     if n_params == 1:
         normim = images[2].data.copy()
@@ -233,4 +239,4 @@ if rank == 0:
     temps = temp
     if verbose: print 'End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean()
     tempmap = GenericMap(temps, header)
-    tempmap.save(path.expanduser('~/macrospicules_paper/CoronaTemps/temporary.fits'))
+    tempmap.save(path.expanduser('/fastdata/sm1ajl/temporary.fits'))
