@@ -57,10 +57,10 @@ class TemperatureMap(GenericMap):
         if fname and not date:
             data_path = path.dirname(fname)
 
-        if verbose: print fname, data_path
+        if verbose: print '\n\n=========\n', fname, data_path, map_path, '\n=========\n\n'
 
         try:
-            newmap = Map(fname)
+            newmap = Map(map_path)
             GenericMap.__init__(self, newmap.data[..., 0], newmap.meta)
             self.goodness_of_fit = newmap.data[..., -1]
             if newmap.data.shape[2] != 2:
