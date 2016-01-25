@@ -125,11 +125,11 @@ if rank == 0:
                 temp_im.data /= temp_im.exposure_time # Can probably increase speed a bit by making this * (1.0/exp_time)
                 images.append(temp_im)
 
-    for i, im in enumerate(images):
+    """for i, im in enumerate(images):
         fig = plt.figure()
         im.plot()
         plt.savefig('/home/sm1ajl/test{}'.format(wlens[i]))
-        plt.close()
+        plt.close()"""
 
     # Normalise images to 171A if only using one parameter
     if n_params == 1:
@@ -226,17 +226,17 @@ if temps.shape[2] > 2: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
 
 # Get data all back in one place and save it
-if size > 1:
-  temps = comm.gather(temps, root=0)
+temps = comm.gather(temps, root=0)
 if rank == 0:
     if verbose: print len(temps), temps[0].shape
-    """temp = np.zeros(shape=(x, y*size, n_params+1))
-    for p in range(size):
-        mini = (p/size)*temp.shape[1]
-        maxi = ((p+1)/size)*temp.shape[1]
-        temp[:, mini:maxi, :] = temps[p]
-        if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
-    temps = temp"""
     if verbose: print 'End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean()
+    if isinstance(temps, list):
+        temp = np.zeros(shape=(x, y*size, n_params+1))
+        for p in range(size):
+            mini = (p/size)*temp.shape[1]
+            maxi = ((p+1)/size)*temp.shape[1]
+            temp[:, mini:maxi, :] = temps[p]
+            if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
+        temps = temp
     tempmap = GenericMap(temps, header)
     tempmap.save(path.expanduser('/fastdata/sm1ajl/temporary.fits'))
