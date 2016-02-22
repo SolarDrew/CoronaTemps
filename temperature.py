@@ -88,11 +88,11 @@ class TemperatureMap(GenericMap):
                 self.emission_measure = data[..., 2]
             self.goodness_of_fit = data[..., -1]
             if verbose:
-                print self.shape
-                print self.goodness_of_fit.shape
+                print self.data.shape
+                print self.goodness_of_fit.data.shape
                 if n_params != 1:
-                    print self.dem_width.shape
-                    print self.emission_measure.shape
+                    print self.dem_width.data.shape
+                    print self.emission_measure.data.shape
             lowx, highx = (self.xrange[0] / self.scale['x'],
                            self.xrange[1] / self.scale['x'])
             lowy, highy = (self.yrange[0] / self.scale['y'],
@@ -242,20 +242,22 @@ class TemperatureMap(GenericMap):
         
         return
     
-    def save(self):
+    def save(self, fname=None):
         date = sunpy.time.parse_time(self.date)
-        if not path.exists(path.dirname(self.map_path)):
-            makedirs(path.dirname(self.map_path))
+        if not fname:
+            fname = self.map_path
+        if not path.exists(path.dirname(fname)):#self.map_path)):
+            makedirs(path.dirname(fname))#self.map_path))
         #fname = path.join(self.map_path,
         #                  '{:%Y-%m-%dT%H_%M_%S}.fits'.format(date))
-        alldata = np.zeros((self.shape[0], self.shape[1], self.n_params+1))
+        alldata = np.zeros((self.data.shape[0], self.data.shape[1], self.n_params+1))
         alldata[..., 0] = self.data
         if self.n_params != 1:
-            fname = self.map_path.replace('.fits', '_full.fits')
+            fname = fname.replace('.fits', '_full.fits')#self.map_path.replace('.fits', '_full.fits')
             alldata[..., 1] = self.dem_width
             alldata[..., 2] = self.emission_measure
-        else:
-            fname = self.map_path
+        #else:
+        #    fname = self.map_path
         alldata[..., -1] = self.goodness_of_fit
         outmap = Map(alldata, self.meta.copy())
         outmap.save(fname, clobber=True)
@@ -320,7 +322,7 @@ class TemperatureMap(GenericMap):
         indices = np.round((tempdata - 4.0) / 0.05).astype(int)
         indices[indices < 0] = 0
         indices[indices > 100] = 100
-        #print emmap.shape, indices.shape, tempdata.shape, aiamap.shape, resp.shape
+        #print emmap.data.shape, indices.data.shape, tempdata.data.shape, aiamap.data.shape, resp.data.shape
         emmap.data = np.log10(aiamap.data / resp[indices])
         #emmap.data = aiamap.data / resp[indices]
 
