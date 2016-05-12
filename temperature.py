@@ -238,9 +238,9 @@ class TemperatureMap(GenericMap):
         if vmax is None:
             vmax = mean + (2.0 * std)
         
-        GenericMap.plot(self, vmin=vmin, vmax=vmax, *args, **kwargs)
+        plot = GenericMap.plot(self, vmin=vmin, vmax=vmax, *args, **kwargs)
         
-        return
+        return plot
     
     def save(self, fname=None):
         date = sunpy.time.parse_time(self.date)
