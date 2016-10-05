@@ -26,15 +26,6 @@ from itertools import product
 from mpi4py import MPI
 from utils import gaussian, load_temp_responses
 from astropy.units import Unit
-try:
-    from fits import calc_fits
-    print 'Fortran extension imported successfully'
-except ImportError:
-    print 'Current extension is broken, missing or incompatible.\n'\
-        +'Compiling Fortran extension.'
-    system(path.expanduser('f2py -c -m fits ~/CoronaTemps/fitsmodule.f90'))
-    from fits import calc_fits
-
 
 home = path.expanduser('~')
 comm = MPI.COMM_WORLD
@@ -51,7 +42,31 @@ for a in argv[1:]:
             continue
     args.append(a)
 
-date, n_params, data_dir, datfile, submap, verbose, force_temp_scan = args
+date, n_params, data_dir, datfile, submap, verbose, force_temp_scan, fullfit = args
+
+"""if rank != 3:
+    fullfit = False"""
+
+if fullfit:
+    try:
+        from fits_ff import calc_fits
+        print 'Fortran extension imported successfully (full-fit)'
+    except ImportError:
+        print 'Current extension is broken, missing or incompatible.\n'\
+            +'Compiling Fortran extension.'
+        system(path.expanduser('f2py -c -m fits_ff ~/CoronaTemps/fitsmod_fullfit.f90'))
+        system(path.expanduser('cp fits_ff.so ~/CoronaTemps/'))
+        from fits_ff import calc_fits
+else:
+    try:
+        from fits import calc_fits
+        print 'Fortran extension imported successfully'
+    except ImportError:
+        print 'Current extension is broken, missing or incompatible.\n'\
+            +'Compiling Fortran extension.'
+        system(path.expanduser('f2py -c -m fits ~/CoronaTemps/fitsmodule.f90'))
+        system(path.expanduser('cp fits.so ~/CoronaTemps/'))
+        from fits import calc_fits
 
 wlens = ['094', '131', '171', '193', '211', '335']
 t0 = 5.6
@@ -89,7 +104,7 @@ if rank == 0:
                 images.append(Map(path.join(fits_dir, 'model.fits')))
                 continue
             else:
-                fits_dir = path.join(data_dir, '{:%Y/*/*}/{}'.format(date, wlen))
+                fits_dir = path.join(data_dir, '{}'.format(wlen))#'{:%Y/*/*}/{}'.format(date, wlen))
             if verbose: print 'Searching {} for AIA data'.format(fits_dir)
             timerange = tr(date - dt.timedelta(seconds=5),
                            date + dt.timedelta(seconds=11))
@@ -179,7 +194,7 @@ if rank == 0:
     try:
         if force_temp_scan:
             raise IOError
-        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+        model = np.memmap(filename=path.join('/fastdata', 'sm1ajl', 'synth_emiss_{}pars'.format(n_params)),
                           dtype='float32', mode='r', shape=(n_vals, n_wlens))
     except IOError:
         if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
@@ -192,7 +207,7 @@ if rank == 0:
             print resp.max(axis=1), np.nanmax(resp, axis=1)
         logt = np.arange(0, 15.05, 0.05)
         delta_t = logt[1] - logt[0]
-        model = np.memmap(filename='synth_emiss_{}pars'.format(n_params),
+        model = np.memmap(filename=path.join('/fastdata', 'sm1ajl', 'synth_emiss_{}pars'.format(n_params)),
                           dtype='float32', mode='w+', shape=(n_vals, n_wlens))
         for p, params in enumerate(parvals):
             dem = gaussian(logt, *params)
@@ -219,7 +234,11 @@ if verbose:
     print model.max(axis=0)
 if n_params == 1:
     parvals = parvals[:, 0]
-temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+print 
+if fullfit:
+    temps, ff_vals = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
+else:
+    temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
 # Convert EM values to log scale if there are any
 if temps.shape[2] > 2: temps[..., 2] = np.log10(temps[..., 2])
 if verbose: print 'Done.'
@@ -228,14 +247,19 @@ if verbose: print 'Done.'
 if size > 1:
   temps = comm.gather(temps, root=0)
 if rank == 0:
-    """if verbose: print len(temps), temps[0].shape
-    temp = np.zeros(shape=(x, y*size, n_params+1))
-    for p in range(size):
-        mini = (p/size)*temp.shape[1]
-        maxi = ((p+1)/size)*temp.shape[1]
-        temp[:, mini:maxi, :] = temps[p]
-        if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
-    temps = temp"""
+    if size > 1:
+        if verbose: print len(temps), temps[0].shape
+        temp = np.zeros(shape=(x, y*size, n_params+1))
+        for p in range(size):
+            mini = (p/size)*temp.shape[1]
+            maxi = ((p+1)/size)*temp.shape[1]
+            temp[:, mini:maxi, :] = temps[p]
+            if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
+        temps = temp
     if verbose: print 'End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean()
     tempmap = GenericMap(temps, header)
     tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
+
+if fullfit:
+    np.save('full-fit-values', ff_vals)
+    np.save('parvals', parvals)
