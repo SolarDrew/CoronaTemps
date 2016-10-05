@@ -11,6 +11,7 @@ REAL :: error, total_error, this_fit, best_fit
 
 DO j = 1, y
   DO i = 1, x
+    !PRINT*, 'testprint', i, j
     best_fit = 1e38 ! Arbitrarily large number
     DO t = 1, n_vals
       total_error = 0.0
