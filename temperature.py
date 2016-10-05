@@ -26,7 +26,7 @@ cortemps = path.join(home, 'CoronaTemps')
 class TemperatureMap(GenericMap):
     def __init__(self, date=None, n_params=1, data_dir=None, maps_dir=None, 
                  fname=None, infofile=None, submap=None, verbose=False,
-                 force_temp_scan=False):
+                 force_temp_scan=False, fullfit=False):
         if (not fname and not date) or (fname and date):
             print """You must specify either a date and time for which to create
                 temperatures or the name of a file containing a valid 
@@ -70,7 +70,7 @@ class TemperatureMap(GenericMap):
             else:
                 n_procs = 1
             cmdargs = ["mpiexec", "-n", n_procs, "python", path.join(cortemps, 'create_tempmap.py'),
-                date, n_params, data_dir, infofile, submap, verbose, force_temp_scan]
+                date, n_params, data_dir, infofile, submap, verbose, force_temp_scan, fullfit]
             cmdargs = [str(cmd) for cmd in cmdargs]
             status = subp.call(cmdargs)
             newmap = Map(path.join(cortemps, 'temporary.fits'))
@@ -291,10 +291,11 @@ class TemperatureMap(GenericMap):
         date = sunpy.time.parse_time(self.date)
         if not model:
             data_dir = self.data_dir
-            fits_dir = path.join(data_dir, '{:%Y/%m/%d}/{}'.format(date, wlen))
+            fits_dir = path.join(data_dir, '{}'.format(wlen))
             filename = path.join(fits_dir,
                                  '*{0:%Y?%m?%d}?{0:%H?%M}*fits'.format(date))
             if wlen == '94': filename = filename.replace('94', '094')
+            print filename
     
             # Load and appropriately process AIA data
             filelist = glob.glob(filename)
@@ -306,7 +307,7 @@ class TemperatureMap(GenericMap):
             aiamap = aiaprep(aiamap)
             aiamap = aiamap.submap(self.xrange, self.yrange)
         else:
-            fname = '/imaps/holly/home/ajl7/CoronaTemps/data/synthetic/{}/model.fits'.format(wlen)
+            fname = '/fastdata/sm1ajl/thesis/data/synthetic/{}/model.fits'.format(wlen)
             if wlen == '94': fname = fname.replace('94', '094')
             aiamap = Map(fname)
 
