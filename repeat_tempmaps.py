@@ -35,7 +35,7 @@ def goes2flux(flareclass):
 
 def repeat(start, end, roi_times=None, timeres=2, coords=None, ar=None,
            split_temps=None, em_wlen=None, plotminmax=False, plotstd=False,
-           hist_type='plain', loaddata=False):#, output=None):
+           hist_type='plain', loaddata=False):
     """
     Wrapper around the main temperature map code.
     Runs create_tempmap repeatedly with the same parameters, allowing the user
@@ -59,13 +59,8 @@ def repeat(start, end, roi_times=None, timeres=2, coords=None, ar=None,
     timeres: int, float
         Temporal resolution of time range in hours.
     """
-    #if isinstance(output, str):
-    #    from matplotlib import use
-    #    use(output)
     import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
-
-    #loaddata = False
 
     print start, end
     start, end = parse(start), parse(end)
@@ -74,9 +69,6 @@ def repeat(start, end, roi_times=None, timeres=2, coords=None, ar=None,
     t = []
     p = []
     
-    #if flares == []:
-    #    return s, t, p
-
     timerange = tr(start, end)
     delta = dt.timedelta(hours=timeres)
     ntimes = int(timerange.seconds()/delta.total_seconds())
@@ -138,15 +130,11 @@ def repeat(start, end, roi_times=None, timeres=2, coords=None, ar=None,
         temps = (temps/float(data.size))*100.0
         tempsovertime[:, i] = temps
 
-        #loops = data[data >= split_temps]
-        #data = data[data < split_temps]
-
         means[i] = np.nanmean(data2)
         try:
             p95s[i] = data2[round(0.95 * len(data2))-1]
         except IndexError:
             p95s[i] = np.NaN
-        #loopmeans[i] = np.nanmean(loops)
         if plotminmax:
             maxes[i] = np.nanmax(data)
             mins[i] = np.nanmin(data)
@@ -157,7 +145,6 @@ def repeat(start, end, roi_times=None, timeres=2, coords=None, ar=None,
             stds[i] = np.nanstd(data)
             if em_wlen:
                 stdem[i] = np.nanstd(emmap)
-            #loopstds[i] = np.nanstd(loops)
     
     tempsovertime[tempsovertime <= 0.1] = np.nan
 
@@ -213,27 +200,9 @@ def repeat(start, end, roi_times=None, timeres=2, coords=None, ar=None,
         plt.legend(loc=4, fontsize=16)
         plt.xlabel('Date', fontsize=24)
         plt.ylabel('log(T)', fontsize=24)
-        #plt.savefig('/media/huw/temp_plots/temp_plot_{}_b'.format(ar))
         plt.savefig('/home/drew/Dropbox/ARs/temps_{}_b'.format(ar))
         plt.close()
 
-        """diff = ((maxes-p95s)/p95s)*100.0
-        fig = plt.figure(figsize=(18, 14))
-        ax = fig.add_subplot(1, 1, 1)
-        plt.title('Percentage difference between max and 95th %-ile; AR{}'.format(ar), 
-                  fontsize=32)
-        plt.plot(tnums, diff, color='black')
-        plt.scatter(fldates, [np.nanmax(diff)]*len(fldates))
-        for flare in flares:
-            ax.text(sunpy.time.parse_time(flare['event_peaktime']), np.nanmax(diff)+0.01, flare['fl_goescls'][0])
-        ax.xaxis_date()
-        fig.autofmt_xdate()
-        plt.xlabel('Date', fontsize=24)
-        plt.ylabel('log(T)', fontsize=24)
-        #plt.savefig('/media/huw/temp_plots/temp_plot_{}'.format(ar))
-        plt.savefig('Dropbox/ARs/diffs_{}'.format(ar))
-        plt.close()"""
-        
     except:# ValueError:
         print "Can't plot the temperature graph because matplotlib is being a whiney douche"
         print tnums
