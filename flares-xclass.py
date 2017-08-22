@@ -6,7 +6,7 @@ Created on Tue Dec 09 18:15:45 2014
 """
 
 from matplotlib import use, rc
-use('pdf')
+#use('pdf')
 rc('savefig', bbox='tight', pad_inches=0.5)
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,9 +23,9 @@ import os
 from os.path import join, exists, dirname, basename
 import sys
 from sys import path, argv
-path.append('/home/sm1ajl/CoronaTemps/')
+#path.append('/home/sm1ajl/CoronaTemps/')
 from temperature import TemperatureMap as tmap
-from astropy import units
+from astropy import units as u
 import glob
 from scipy.io.idl import readsav
 
@@ -60,7 +60,7 @@ def flareclass_to_flux(flareclass):
     conversions = {'A': 1.0e-8, 'B': 1.0e-7, 'C': 1.0e-6, 'M': 1.0e-5,
                    'X': 1.0e-4}
     fluxval = float(flareclass[1:]) * conversions[flareclass[0]]
-    flux = units.Quantity(fluxval, "W/m^2")
+    flux = u.Quantity(fluxval, "W/m^2")
     
     return flux
 
@@ -76,8 +76,9 @@ if parameter == 'all':
 else:
     pars = [parameter]
 
-savedir = "/fastdata/sm1ajl/thesis/plots/chapter6/x_class/temperature/{}/".format(parameter.replace(' ', '_').replace('.', '_'))
-print exists(savedir)
+fastdata = "/fastdata/sm1ajl/flares-paper/"
+savedir = join(fastdata, "plots/x_class/{}/".format(parameter.replace(' ', '_').replace('.', '_')))
+print(exists(savedir))
 if density:
     savedir = savedir.replace('temperature', 'density_{}'.format(density))
 if not exists(savedir):
@@ -85,14 +86,21 @@ if not exists(savedir):
 
 #flarefiles = glob.glob('/imaps/sspfs/archive/sdo/aia/flares/*/*.dat')
 #print len(flarefiles)
-start = parse('2010-07-14')
-end = parse('2011-09-19')
+#start = parse('2010-07-14')
+#end = parse('2011-09-19')
+#start = parse('2010-10-01')
+#end = parse('2010-11-01')
+start = parse('2011-03-01')
+end = parse('2011-04-01')
 
 client = hek.HEKClient()
 allflares = client.query(hek.attrs.Time(start, end),
                          hek.attrs.EventType('FL'))
+#import pdb; pdb.set_trace()
+#print(len(allflares))
 allflares = [fl for fl in allflares if (fl['fl_goescls'] != "" and fl['fl_goescls'][0] == 'X')]
-print len(allflares)
+for f in allflares: print('class:', f['fl_goescls'], f['event_starttime'], f['hgc_x'], f['hgc_y'])
+print(len(allflares))
 
 ar_rad = 75
 ar_temps_fltime = []
@@ -114,7 +122,7 @@ for i in range(4):
     thisfig, thisax = plt.subplots(3, 2, figsize=(16, 24))
     figs.append(thisfig)
     axa1 += list(thisax.flatten())
-print len(figs), len(axa1)
+print(len(figs), len(axa1))
 #absfig, axa1 = plt.subplots(4, 6, figsize=(32, 16))
 #axa1 = axa1.flatten()
 #axa1.set_ylabel('{} log(T)'.format(parameter.title()))
@@ -133,6 +141,9 @@ flarecolours = {'A': 0.2, 'B': 0.3, 'C': 0.4, 'M': 0.5, 'X': 0.6}
 #allars_hist = np.zeros((141, 30))
 dTdt = np.zeros(shape=(3, len(allflares)))#len(flarefiles)-4))
 
+data_root = join(fastdata, 'data')
+maps_root = join(fastdata, 'maps')
+
 f = 0
 #for file in flarefiles[:-2]:
 #  flare = readsav(file)['dnow'][0]
@@ -146,34 +157,35 @@ for flare in allflares:
   #print flare['AR'], flare['xpos'], flare['ypos']
   #continue
   try:
-    flaretime = dt.datetime(1958, 1, 1) + dt.timedelta(0, flare['starttai'])
-    if flaretime.minute % 2 != 0: flaretime = flaretime.replace(minute=flaretime.minute - 1)
-    starttime = flaretime - dt.timedelta(hours=0.5)
+    flaretime = parse(flare['event_starttime']) #dt.datetime(1958, 1, 1) + dt.timedelta(0, flare['starttai'])
+    #if flaretime.minute % 2 != 0: flaretime = flaretime.replace(minute=flaretime.minute - 1)
+    starttime = flaretime - dt.timedelta(hours=24)#hours=0.5)
     timerange = tr(starttime, flaretime)
-    x, y = flare['xpos'], flare['ypos']
+    x, y = flare['hgc_x'], flare['hgc_y']
     if (x, y) == (0, 0):
         continue
 
     # Define times for maps
-    delta = dt.timedelta(minutes=2)
-    ntimes = int(timerange.seconds()/delta.total_seconds())
-    times = [time.start() for time in timerange.split(ntimes)]
-    print times
+    delta = dt.timedelta(hours=2)#minutes=2)
+    ntimes = int(timerange.seconds/(delta.total_seconds()*u.s))
+    times = [time.start for time in timerange.split(ntimes)]
+    print(times)
     
-    flaredir = dirname(file)
-    print flaredir
-    data_dir = join(flaredir, 'data/')
-    maps_root = join(flaredir, 'fits/')
-    paramvals_fname = join(flaredir, 'params_{}'.format(str(flaretime).replace(' ', 'T')))
+    #flaredir = join(fastdata, 'plots', 'x_class', )
+    #flaredir = dirname(file)
+    #print(flaredir)
+    #data_dir = join(flaredir, 'data/')
+    #maps_root = join(flaredir, 'fits/')
+    paramvals_fname = join(savedir, 'params_{}'.format(str(flaretime).replace(' ', 'T')))
     if density:
         paramvals_fname += '_density{}'.format(density)
-    print 'Loading ', paramvals_fname
+    print('Loading ', paramvals_fname)
     
     if not exists(paramvals_fname):
       paramvals = np.zeros((11, ntimes))
       for t, time in enumerate(times):
         # Load/calculate temperature map data
-        print time
+        print(time)
         try:
             """cname = join(data_dir, '171/AIA{0:%Y%m%d}?{0:%H%M}*fits'.format(time))
             print dirname(cname), exists(dirname(cname))
@@ -195,15 +207,29 @@ for flare in allflares:
             plt.savefig(cname)
             plt.close()"""
 
-            maps_dir = join(maps_root, "{:%Y/%m/%d}/temperature/".format(time))
+            #maps_dir = join(maps_root, "{:%Y/%m/%d}/temperature/".format(time))
+            data_dir = join(data_root, "{:%Y/%m/%d/}".format(time))
+            maps_dir = join(maps_root, "{:%Y/%m/%d/}".format(time))
             thismap = tmap(time, data_dir=data_dir, maps_dir=maps_dir)#, verbose=True)#,
             #               submap=([x-ar_rad, x+ar_rad], [y-ar_rad, y+ar_rad]))
+            print(thismap.maps_dir)
+            ars = client.query(hek.attrs.Time(time, time),
+                               hek.attrs.EventType('AR'),
+                               hek.attrs.AR.NOAANum==flare['ar_noaanum'])
+            print(len(ars))
+            dts = [abs(time-parse(a['event_starttime'])) for a in ars]
+            ar = ars[dts.index(min(dts))]
+            x, y = ar['hpc_x'], ar['hpc_y']
             thismap.save()
+            if t == 0:
+                x, y = wcs.convert_hg_hpc(x, y, 
+                                          b0_deg=thismap.heligraphic_latitude.value,
+                                          l0_deg=thismap.carrington_longitude.value)
             if density:
                 thismap = thismap.calculate_density(wlen=density)
             # Crop temperature map to active region
-            largemap = thismap.submap([x-200, x+200], [y-200, y+200])
-            thismap = thismap.submap([x-ar_rad, x+ar_rad], [y-ar_rad, y+ar_rad])
+            largemap = thismap.submap([x-200, x+200]*u.arcsec, [y-200, y+200]*u.arcsec)
+            thismap = thismap.submap([x-ar_rad, x+ar_rad]*u.arcsec, [y-ar_rad, y+ar_rad]*u.arcsec)
             plt.figure("tmaps")
             tmapfig.clf()
             axt1 = tmapfig.add_subplot(111, axisbg='black')
@@ -227,13 +253,15 @@ for flare in allflares:
             #plt.colorbar()
             #plt.tight_layout()
             plt.title('Max: {:.2f}, Mean: {:.2f}, Min: {:.2f}'.format(thismap.max(), thismap.mean(), thismap.min()))
-            output_dir = join('/imaps/holly/home/ajl7/AR-tmaps/',
-                              basename(flaredir), '{:%Y/%m/%d}'.format(time))
-            if density:
-                output_dir = output_dir.replace('tmaps', 'nmaps_{}'.format(density))
-            if not exists(output_dir):
-                os.makedirs(output_dir)
-            plt.savefig(join(output_dir, '{:%Y-%m-%dT%H%M}'.format(time)))
+            #output_dir = join('/imaps/holly/home/ajl7/AR-tmaps/',
+            #                  basename(flaredir), '{:%Y/%m/%d}'.format(time))
+            #if density:
+            #    output_dir = output_dir.replace('tmaps', 'nmaps_{}'.format(density))
+            #if not exists(output_dir):
+            #    os.makedirs(output_dir)
+            #plt.savefig(join(output_dir, '{:%Y-%m-%dT%H%M}'.format(time)))
+            plt.savefig(join(savedir, '{:%Y-%m-%dT%H%M}'.format(time)))
+            continue
         
             data = thismap.data
             paramvals[:, t] = [np.nanmin(data),
@@ -249,7 +277,7 @@ for flare in allflares:
                                np.count_nonzero(data > 6.5)]
             #                   np.count_nonzero(data > 6.02 and data < 6.08)]
         except:
-            print "Failed", time
+            print("Failed", time)
             paramvals[:, t] = 0
             np.savetxt(paramvals_fname, paramvals)
             raise
@@ -263,12 +291,12 @@ for flare in allflares:
         # I'm a bad man
         parind = allpars.index(par)
         means = paramvals[parind, :]
-        print parind, par
+        print(parind, par)
         if par == 'stddev':
             continue
         #print means
         if 'n over' not in parameter and 0 in means:
-            print 'Anomalous data - skipping'
+            print('Anomalous data - skipping')
             continue
         #means = np.array([i/max(means) for i in means])
         #print means
@@ -320,9 +348,10 @@ for flare in allflares:
     #print 'Flarelist file written to'
     f += 1
   except:
-    print 'Failed for {} flare at {}'.format(flare, parse(flare['starttai']))
-    raise
-    #continue
+    print('Failed for {} flare at {}'.format(flare['fl_goescls'], parse(flare['event_starttime'])))
+    #import pdb; pdb.set_trace()
+    #raise
+    continue
 
 values = ''.join([' & ${:e} }}$'.format(thispar) for thispar in dTdt.mean(axis=1)]).replace('e', '\\times 10^{')
 flarelist.write("\hline \nAvg over all regions{}\\\\ \n".format(values))
@@ -330,7 +359,7 @@ flarelist.write("\\end{tabular}")
 flarelist.close()
 
 
-print 'plot 1'
+print('plot 1')
 
 #axa1.set_ylim(limits1[0]-0.02, limits1[1]+0.02)
 for p in axa1:
@@ -344,8 +373,14 @@ for i in range(4):
 #absfig.savefig(join(savedir, "allars_close_{}"))
 plt.close('all')
 
-print 'plot 2'
+print('plot 2')
 
+
+sys.exit()
+# =================================
+# THIS STUFF IS FOR SINGLE QUIET SUN REGION.
+# NEED TO FIX IT AND RUN IT AT SOME POINT BUT THAT THE MOMENT IT'S RUNNING FROM A SAVEFILE THAT DOESN'T EXIST
+# =================================
 quiet = np.load('quiet.npy')
 colours = [' ', 'orange', 'darkorange', 'red']
 
@@ -506,4 +541,4 @@ for axis in [ax1, ax2, ax3]:
 plt.savefig(join(savedir, "allflares_diffs"))
 plt.close()
 
-print 'end'
+print('end')

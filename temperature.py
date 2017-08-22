@@ -14,13 +14,14 @@ from sunpy.map import Map, GenericMap
 from sunpy.instr.aia import aiaprep
 from sys import argv
 from os import path, makedirs
-import subprocess32 as subp
+#import subprocess32 as subp
+import subprocess as subp
 from scipy.io.idl import readsav as read
 import glob
 
 
 home = path.expanduser('~')
-cortemps = path.join(home, 'CoronaTemps')
+cortemps = path.join(home, 'flaring-ars-paper', 'CoronaTemps')
 
 
 class TemperatureMap(GenericMap):
@@ -28,9 +29,7 @@ class TemperatureMap(GenericMap):
                  fname=None, infofile=None, submap=None, verbose=False,
                  force_temp_scan=False, fullfit=False):
         if (not fname and not date) or (fname and date):
-            print """You must specify either a date and time for which to create
-                temperatures or the name of a file containing a valid 
-                TemperatureMap object."""
+            print("You must specify either a date and time for which to create temperatures or the name of a file containing a valid TemperatureMap object.")
             return
 
         if date:
@@ -55,7 +54,7 @@ class TemperatureMap(GenericMap):
         if fname and not date:
             data_dir = path.dirname(fname)
 
-        if verbose: print fname, data_dir
+        if verbose: print(fname, data_dir)
 
         try:
             newmap = Map(fname)
@@ -76,7 +75,7 @@ class TemperatureMap(GenericMap):
             newmap = Map(path.join(cortemps, 'temporary.fits'))
             subp.call(["rm", path.join(cortemps, 'temporary.fits')])
             data, meta = newmap.data, newmap.meta
-            if verbose: print data.shape
+            if verbose: print(data.shape)
             GenericMap.__init__(self, data[..., 0], meta)
             if data.shape[2] != 2:
                 data[data == 0] = np.nan
@@ -84,19 +83,20 @@ class TemperatureMap(GenericMap):
                 self.emission_measure = data[..., 2]
             self.goodness_of_fit = data[..., -1]
             if verbose:
-                print self.shape
-                print self.goodness_of_fit.shape
+                print(self.data.shape)
+                print(self.goodness_of_fit.shape)
                 if n_params != 1:
-                    print self.dem_width.shape
-                    print self.emission_measure.shape
-            lowx, highx = (self.xrange[0] / self.scale['x'],
-                           self.xrange[1] / self.scale['x'])
-            lowy, highy = (self.yrange[0] / self.scale['y'],
-                           self.yrange[1] / self.scale['y'])
+                    print(self.dem_width.shape)
+                    print(self.emission_measure.shape)
+            lowx, highx = ((self.xrange[0] / self.scale.x).value,
+                           (self.xrange[1] / self.scale.x).value)
+            lowy, highy = ((self.yrange[0] / self.scale.y).value,
+                           (self.yrange[1] / self.scale.y).value)
             x_grid, y_grid = np.mgrid[lowx:highx-1, lowy:highy-1]
             r_grid = np.sqrt((x_grid ** 2.0) + (y_grid ** 2.0))
-            outer_rad = (self.rsun_arcseconds * 1.5) / self.scale['x']
-            self.data[r_grid > outer_rad] = None
+            outer_rad = (self.rsun_obs * 1.5) / self.scale.x
+            print('----\n', self.rsun_obs, outer_rad, '\n----')
+            self.data[r_grid > outer_rad.value] = None
             self.meta['date-obs'] = str(date)
 
         tmapcubehelix = _cm.cubehelix(s=2.8, r=0.7, h=2.0, gamma=1.0)
@@ -145,8 +145,8 @@ class TemperatureMap(GenericMap):
     
     def convert_scale(self, scale='linear'):
         if self.temperature_scale == scale:
-            print "Temperatures are already measured on a {} scale.".format(
-                scale)
+            print("Temperatures are already measured on a {} scale.".format(
+                scale))
             return
         elif scale == 'linear':
             self.data = (10.0 ** self.data) / 1.0e6
@@ -159,7 +159,7 @@ class TemperatureMap(GenericMap):
     def compare(self, display_wlen='171', context_wlen=None, extra_maps=[]):
         valid_wlens = ['94', '131', '171', '195', '211', '335', '304', 'hmi']
         if display_wlen.lower() not in valid_wlens:
-            print "Display wavelength provided invalid or None."
+            print("Display wavelength provided invalid or None.")
             output = self.plot()#*temp_args, **temp_kwargs)
             return output
         save_output = True
@@ -267,6 +267,10 @@ class TemperatureMap(GenericMap):
     def std(self):
         return np.nanstd(self.data, dtype='float64')
 
+    @property
+    def shape(self):
+        return self.data.shape
+
     def calculate_em(self, wlen='171', dz=100, model=False):
         """
         Calculate an approximation of the coronal EmissionMeasure using a given
@@ -295,12 +299,12 @@ class TemperatureMap(GenericMap):
             filename = path.join(fits_dir,
                                  '*{0:%Y?%m?%d}?{0:%H?%M}*fits'.format(date))
             if wlen == '94': filename = filename.replace('94', '094')
-            print filename
+            print(filename)
     
             # Load and appropriately process AIA data
             filelist = glob.glob(filename)
             if filelist == []:
-                print 'AIA data not found :('
+                print('AIA data not found :(')
                 return
             aiamap = Map(filename)
             aiamap.data /= aiamap.exposure_time
@@ -316,7 +320,7 @@ class TemperatureMap(GenericMap):
         indices = np.round((tempdata - 4.0) / 0.05).astype(int)
         indices[indices < 0] = 0
         indices[indices > 100] = 100
-        #print emmap.shape, indices.shape, tempdata.shape, aiamap.shape, resp.shape
+        #print(emmap.shape, indices.shape, tempdata.shape, aiamap.shape, resp.shape)
         emmap.data = np.log10(aiamap.data / resp[indices])
         #emmap.data = aiamap.data / resp[indices]
 
@@ -337,7 +341,7 @@ if __name__ == "__main__":
     
     image_dir = open(infofile).readline()[:-1]
     fname = path.join(image_dir, '{:%Y-%m-%dT%H_%M_%S}'.format(date))
-    print "Temperature map image saved to: {}".format(fname)
+    print("Temperature map image saved to: {}".format(fname))
     
     fig = plt.figure(16, 12)
     tmap.plot()

@@ -25,9 +25,10 @@ import glob
 from itertools import product
 from mpi4py import MPI
 from utils import gaussian, load_temp_responses
-from astropy.units import Unit
+import astropy.units as u
 
 home = path.expanduser('~')
+cortemps = path.join(home, 'flaring-ars-paper', 'CoronaTemps')
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
@@ -50,22 +51,23 @@ date, n_params, data_dir, datfile, submap, verbose, force_temp_scan, fullfit = a
 if fullfit:
     try:
         from fits_ff import calc_fits
-        print 'Fortran extension imported successfully (full-fit)'
+        print('Fortran extension imported successfully (full-fit)')
     except ImportError:
-        print 'Current extension is broken, missing or incompatible.\n'\
-            +'Compiling Fortran extension.'
+        print('Current extension is broken, missing or incompatible.\n'\
+            +'Compiling Fortran extension.')
         system(path.expanduser('f2py -c -m fits_ff ~/CoronaTemps/fitsmod_fullfit.f90'))
         system(path.expanduser('cp fits_ff.so ~/CoronaTemps/'))
         from fits_ff import calc_fits
 else:
     try:
         from fits import calc_fits
-        print 'Fortran extension imported successfully'
+        print('Fortran extension imported successfully')
     except ImportError:
-        print 'Current extension is broken, missing or incompatible.\n'\
-            +'Compiling Fortran extension.'
-        system(path.expanduser('f2py -c -m fits ~/CoronaTemps/fitsmodule.f90'))
-        system(path.expanduser('cp fits.so ~/CoronaTemps/'))
+        print('Current extension is broken, missing or incompatible.\n'\
+            +'Compiling Fortran extension.')
+        #system(path.expanduser('f2py -c -m fits ~/CoronaTemps/fitsmodule.f90'))
+        #system(path.expanduser('cp fits.so ~/CoronaTemps/'))
+        system(path.expanduser('f2py -c -m fits fitsmodule.f90'))
         from fits import calc_fits
 
 wlens = ['094', '131', '171', '193', '211', '335']
@@ -81,7 +83,7 @@ if rank == 0:
             if line[:3] in wlens:
                 allwlenmaps = []
                 thiswlen = line[:3]
-                print 'Loading {} files'.format(thiswlen)
+                print('Loading {} files'.format(thiswlen))
             elif 'fits' in line:
                 thismap = aiaprep(Map(line[:-1]))
                 thismap.data /= thismap.exposure_time
@@ -105,20 +107,20 @@ if rank == 0:
                 continue
             else:
                 fits_dir = path.join(data_dir, '{}'.format(wlen))#'{:%Y/*/*}/{}'.format(date, wlen))
-            if verbose: print 'Searching {} for AIA data'.format(fits_dir)
+            if verbose: print('Searching {} for AIA data'.format(fits_dir))
             timerange = tr(date - dt.timedelta(seconds=5),
                            date + dt.timedelta(seconds=11))
-            ntimes = int(timerange.seconds())
-            times = [time.start() for time in timerange.split(ntimes)]
+            ntimes = int(timerange.seconds.value)
+            times = [time.start for time in timerange.split(ntimes)]
             for time in times:
                 filename = path.join(fits_dir,
                     'aia*{0:%Y?%m?%d}?{0:%H?%M?%S}*lev1?fits'.format(time))
                     #'AIA{0:%Y%m%d_%H%M_*.fits}'.format(time))
-                if verbose: print filename
+                if verbose: print(filename)
                 filelist = glob.glob(filename)
-                if verbose: print filelist
+                if verbose: print(filelist)
                 if filelist != []:
-                    if verbose: print 'File found: ', filelist[0]
+                    if verbose: print('File found: ', filelist[0])
                     #imagefiles.append(filelist[0])
                     temp_im = aiaprep(Map(filelist[0]))
                     if submap:
@@ -129,16 +131,17 @@ if rank == 0:
                 else:
                     pass
             if len(images) < wl+1:
-                if verbose: print 'No data found for {}. Downloading...'.format(wlen)
+                if verbose: print('No data found for {}. Downloading...'.format(wlen))
                 client = vso.VSOClient()
-                qr = client.query(vso.attrs.Time(timerange.start(), timerange.end()),
-                                  vso.attrs.Wave(wlen, wlen),
+                wlenAA = int(wlen)*u.AA
+                qr = client.query(vso.attrs.Time(timerange.start, timerange.end),
+                                  vso.attrs.Wave(wlenAA, wlenAA),
                                   vso.attrs.Instrument('aia'),
                                   vso.attrs.Provider('JSOC'))
                 dwpath = path.join(fits_dir.replace('*/*', '{:%m/%d}'.format(date)),
                                    '{file}')
                 res = client.get(qr, path=dwpath, site='NSO').wait()
-		if isinstance(res, list): res = res[0]
+                if isinstance(res, list): res = res[0]
                 temp_im = aiaprep(Map(res))
                 if submap:
                     temp_im = temp_im.submap(*submap)
@@ -148,7 +151,7 @@ if rank == 0:
     # Normalise images to 171A if only using one parameter
     if n_params == 1:
         normim = images[2].data.copy()
-        if verbose: print 'Normalising images'
+        if verbose: print('Normalising images')
         for i in range(len(wlens)):
             images[i].data /= normim
     header = images[2].meta.copy()
@@ -164,9 +167,9 @@ if size > 1:
         mini = (p/size)*images.shape[2]
         maxi = ((p+1)/size)*images.shape[2]
         temp.append(images[..., mini:maxi])
-        if verbose: print p, mini, maxi, images[..., mini:maxi].shape
+        if verbose: print(p, mini, maxi, images[..., mini:maxi].shape)
     images = temp
-    if verbose: print len(images), images[0].shape
+    if verbose: print(len(images), images[0].shape)
   else:
     images = None
   images = comm.scatter(images, root=0)
@@ -174,8 +177,8 @@ if size > 1:
 # Get dimensions of image
 x, y = images[0].shape
 if verbose:
-    print 'Image size, rank {}:'.format(rank), x, y
-    print 'Image maxes, rank {}:'.format(rank), [im.max() for im in images]
+    print('Image size, rank {}:'.format(rank), x, y)
+    print('Image maxes, rank {}:'.format(rank), [im.max() for im in images])
 n_wlens = images.shape[0]
 temp = np.arange(t0, 7.01, 0.01)
 if n_params == 1:
@@ -188,7 +191,7 @@ else:
     # TODO: check if either of the above are sensible ranges of numbers
 parvals = np.array([i for i in product(temp, widths, heights)])
 n_vals = len(temp) * len(widths) * len(heights)
-if verbose: print len(temp), len(widths), len(heights), n_vals, n_vals*6
+if verbose: print(len(temp), len(widths), len(heights), n_vals, n_vals*6)
 
 if rank == 0:
     try:
@@ -197,14 +200,14 @@ if rank == 0:
         model = np.memmap(filename=path.join('/fastdata', 'sm1ajl', 'synth_emiss_{}pars'.format(n_params)),
                           dtype='float32', mode='r', shape=(n_vals, n_wlens))
     except IOError:
-        if verbose: print 'No synthetic emission data found. Re-scanning temperature range.'
+        if verbose: print('No synthetic emission data found. Re-scanning temperature range.')
         resp = load_temp_responses()
         if n_params == 1:
             resp /= resp[2, :]
             resp[np.isnan(resp)] = 0
         if verbose:
-            print resp.min(axis=1), np.nanmin(resp, axis=1)
-            print resp.max(axis=1), np.nanmax(resp, axis=1)
+            print(resp.min(axis=1), np.nanmin(resp, axis=1))
+            print(resp.max(axis=1), np.nanmax(resp, axis=1))
         logt = np.arange(0, 15.05, 0.05)
         delta_t = logt[1] - logt[0]
         model = np.memmap(filename=path.join('/fastdata', 'sm1ajl', 'synth_emiss_{}pars'.format(n_params)),
@@ -214,13 +217,13 @@ if rank == 0:
             f = resp * dem
             model[p, :] = np.sum(f, axis=1) * delta_t
         if verbose:
-            print model.max(axis=0)
-            print model[np.isnan(model)].size
+            print(model.max(axis=0))
+            print(model[np.isnan(model)].size)
         if n_params == 1:
             normmod = model[:, 2].reshape((n_vals, 1))
             model /= normmod
         model.flush()
-        if verbose: print model.max(axis=0)
+        if verbose: print(model.max(axis=0))
 else:
     model = None
 
@@ -228,37 +231,37 @@ if size > 1:
     model = comm.bcast(model, root=0)
 
 if verbose:
-    if rank == 0: print 'Calculating temperature values...'
-    print rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params
-    print [im.max() for im in images]
-    print model.max(axis=0)
+    if rank == 0: print('Calculating temperature values...')
+    print(rank, images.shape, model.shape, parvals.shape, n_vals, n_wlens, x, y, n_params)
+    print([im.max() for im in images])
+    print(model.max(axis=0))
 if n_params == 1:
     parvals = parvals[:, 0]
-print 
+print()
 if fullfit:
     temps, ff_vals = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
 else:
     temps = calc_fits(images, model, parvals, n_vals, n_wlens, x, y, n_params)
 # Convert EM values to log scale if there are any
 if temps.shape[2] > 2: temps[..., 2] = np.log10(temps[..., 2])
-if verbose: print 'Done.'
+if verbose: print('Done.')
 
 # Get data all back in one place and save it
 if size > 1:
   temps = comm.gather(temps, root=0)
 if rank == 0:
     if size > 1:
-        if verbose: print len(temps), temps[0].shape
+        if verbose: print(len(temps), temps[0].shape)
         temp = np.zeros(shape=(x, y*size, n_params+1))
         for p in range(size):
             mini = (p/size)*temp.shape[1]
             maxi = ((p+1)/size)*temp.shape[1]
             temp[:, mini:maxi, :] = temps[p]
-            if verbose: print p, mini, maxi, temp[:, mini:maxi, :].shape
+            if verbose: print(p, mini, maxi, temp[:, mini:maxi, :].shape)
         temps = temp
-    if verbose: print 'End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean()
+    if verbose: print('End ct', temps.shape, temps[..., 0].mean(), temps[..., 1].mean())
     tempmap = GenericMap(temps, header)
-    tempmap.save(path.expanduser('~/CoronaTemps/temporary.fits'))
+    tempmap.save(path.join(cortemps, 'temporary.fits'))
 
 if fullfit:
     np.save('full-fit-values', ff_vals)
