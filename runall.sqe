@@ -1,0 +1,23 @@
+#$ -S /bin/sh
+#$ -l h_rt=60:00:00
+#$ -cwd
+#$ -l mem=8G
+#$ -l rmem=8G
+#$ -N flares_allclasses
+# #$ -N flares_xflares
+#$ -P mhd
+
+echo
+echo $(date)
+echo
+echo
+
+module purge
+module load /apps/python/conda/
+module load /mpi/gcc/openmpi/1.10.0
+
+source activate flares-paper
+cd /data/sm1ajl/flaring-ars-paper/CoronaTemps
+
+python flares-allclasses.py
+#python flares-xclass.py
